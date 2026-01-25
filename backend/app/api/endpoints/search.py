@@ -1,40 +1,62 @@
+# backend/app/api/endpoints/search.py
 import shutil
 import os
-from fastapi import APIRouter, UploadFile, File
-from app.engine.predictor import reid_engine
+import time
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.services.search_service import SearchService
 
 router = APIRouter()
 
 @router.post("/search")
-async def search_vehicle(file: UploadFile = File(...)):
+async def search_vehicle(
+    file: UploadFile = File(...),
+    top_k: int = Form(10),  # 允许前端指定返回几条，默认10
+    db: Session = Depends(get_db)
+):
     """
-    HTTP POST 接口：处理图片上传与检索请求
+    接收上传图片 -> 调用 SearchService -> 返回真实检索结果
     """
-    # 1. 定义临时文件路径
-    temp_filename = f"temp_{file.filename}"
+    # 1. 保存临时文件
+    # 确保 temp 目录存在
+    os.makedirs("temp", exist_ok=True)
+    temp_filename = f"temp/query_{int(time.time())}_{file.filename}"
     
     try:
-        # 2. 将上传的图片流写入本地磁盘
+        start_time = time.time()
+        
+        # 写入磁盘
         with open(temp_filename, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # 3. 调用 AI 引擎提取特征
-        # (这一步会验证上面的 predictor.py 是否工作正常)
-        feature = reid_engine.extract_feature(temp_filename)
+        # 2. 初始化检索服务
+        service = SearchService(db)
         
-        # 4. 返回 JSON 结果给前端
+        # 3. 执行检索 (核心逻辑)
+        results = service.search(img_path=temp_filename, top_k=top_k)
+        
+        cost_time = time.time() - start_time
+        
+        # 4. 构造标准返回格式
         return {
             "code": 200,
-            "filename": file.filename,
-            "message": "Backend skeleton is working!",
-            "feature_shape": feature.shape,  # 预期输出: (2048,)
-            "note": "目前使用的是模拟特征数据"
+            "message": "success",
+            "data": {
+                "time_cost": round(cost_time, 4),
+                "total_found": len(results),
+                "results": results
+            }
         }
         
     except Exception as e:
+        print(f"❌ 检索出错: {str(e)}")
         return {"code": 500, "message": str(e)}
         
     finally:
-        # 5. 清理垃圾：删除临时图片
+        # 5. 清理现场
         if os.path.exists(temp_filename):
-            os.remove(temp_filename)
+            try:
+                os.remove(temp_filename)
+            except:
+                pass

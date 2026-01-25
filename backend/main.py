@@ -1,41 +1,47 @@
 import uvicorn
+import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles  # 1. 引入静态文件处理
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-# 引入我们刚才写的接口文件
 from app.api.endpoints import search
-# 引入引擎，确保启动时能执行初始化
 from app.engine.predictor import reid_engine
 
 # 初始化 FastAPI 应用
 app = FastAPI(title=settings.PROJECT_NAME)
 
-# 配置跨域资源共享 (CORS)
-# 允许你的 Vue 前端 (通常在端口 5173) 访问此后端
+# 配置跨域 (CORS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 开发阶段允许所有来源
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 注册路由：把 search.py 里的接口挂载到 /api/v1 路径下
+# 2. 挂载静态文件目录
+# 让前端可以通过 http://localhost:8000/static/gallery/xxx.jpg 访问图片
+# 我们挂载的是项目根目录下的 datasets 文件夹
+datasets_dir = os.path.join(settings.BASE_DIR, "../datasets")
+if not os.path.exists(datasets_dir):
+    os.makedirs(datasets_dir) # 防止目录不存在报错
+    
+app.mount("/static", StaticFiles(directory=datasets_dir), name="static")
+
+# 注册路由
 app.include_router(search.router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():
-    """
-    系统启动时的钩子函数
-    """
     print("⏳ Initializing ReID Engine...")
-    reid_engine.setup()
-    print("🚀 System works! Backend is running at http://127.0.0.1:8000")
+    # 预热引擎（可选，避免第一次请求太慢）
+    # reid_engine.setup() 
+    print(f"🚀 System works! API Docs: http://127.0.0.1:8000/docs")
+    print(f"📂 Static Files served at: http://127.0.0.1:8000/static")
 
 @app.get("/")
 def read_root():
     return {"status": "healthy", "service": settings.PROJECT_NAME}
 
 if __name__ == "__main__":
-    # 启动服务器，开启 reload 模式（代码修改后自动重启）
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

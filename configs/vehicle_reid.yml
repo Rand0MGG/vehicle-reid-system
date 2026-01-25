@@ -1,0 +1,20 @@
+_BASE_: "../fastreid/configs/Base-bagtricks.yml"
+
+MODEL:
+  HEADS:
+    NUM_CLASSES: 576
+  BACKBONE:
+    DEPTH: "50x"
+    FEAT_DIM: 2048
+    WITH_IBN: True
+    WITH_NL: False
+    # --- 关键修改：禁止自动下载预训练权重 ---
+    PRETRAIN: False
+    # ----------------------------------
+  DEVICE: "cpu"
+
+INPUT:
+  SIZE_TEST: [256, 256]
+
+DATALOADER:
+  NUM_WORKERS: 0

@@ -11,7 +11,7 @@ MODEL:
     # --- 关键修改：禁止自动下载预训练权重 ---
     PRETRAIN: False
     # ----------------------------------
-  DEVICE: "cpu"
+  DEVICE: "cuda"
 
 INPUT:
   SIZE_TEST: [256, 256]

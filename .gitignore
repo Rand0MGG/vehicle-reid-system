@@ -4,7 +4,7 @@ __pycache__/
 .vscode/
 venv/
 reid_env/
-outputs/
-datasets/
+/outputs/
+/datasets/
 # 忽略包含密码的配置文件
 backend/app/core/config.py

@@ -98,6 +98,7 @@
     </div>
     
     <el-empty v-else-if="searched" description="未找到相似车辆" />
+    <el-button type="danger" @click="handleLogout">退出系统</el-button>
   </div>
 </template>
 
@@ -106,6 +107,7 @@ import { ref } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { searchVehicle } from '@/api/search'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
 // 状态定义
 const loading = ref(false)
@@ -116,6 +118,13 @@ const file = ref(null)
 const previewUrl = ref('')
 const results = ref([])
 const timeCost = ref(0)
+const router = useRouter()
+
+const handleLogout = () => {
+  localStorage.removeItem('access_token')
+  ElMessage.success('已安全退出系统')
+  router.push('/login')
+}
 
 // 1. 处理文件选择
 const handleFileChange = (uploadFile) => {

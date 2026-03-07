@@ -1,9 +1,5 @@
-<script setup>
-import Search from './views/Search.vue'
-</script>
-
 <template>
-  <Search />
+  <router-view />
 </template>
 
 <style>

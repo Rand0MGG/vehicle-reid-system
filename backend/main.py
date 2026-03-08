@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.endpoints import search, auth  # 此处补充导入 auth 模块
+from app.api.endpoints import search, auth, admin_api
 from app.engine.predictor import reid_engine
 
 app = FastAPI(title=settings.PROJECT_NAME)
@@ -23,9 +23,9 @@ if not os.path.exists(datasets_dir):
     
 app.mount("/static", StaticFiles(directory=datasets_dir), name="static")
 
-# 注册路由
 app.include_router(search.router, prefix=settings.API_V1_STR)
-app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"]) # 此处追加认证路由注册
+app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
+app.include_router(admin_api.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
 
 @app.on_event("startup")
 async def startup_event():

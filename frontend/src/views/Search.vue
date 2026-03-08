@@ -1,7 +1,7 @@
 <template>
   <div class="search-container">
     <div class="header">
-      <h2>🔍 车辆重识别检索系统 (Vehicle ReID)</h2>
+      <h2>车辆重识别检索系统</h2>
       <p>上传目标车辆图片，在底库中检索同车轨迹</p>
     </div>
 
@@ -31,7 +31,7 @@
 
         <el-col :span="14" class="action-col">
           <el-form label-position="top">
-            <el-form-item label="期望结果数量 (Top-K)">
+            <el-form-item label="期望结果数量">
               <el-slider v-model="topK" :min="1" :max="20" show-input />
             </el-form-item>
             
@@ -54,7 +54,7 @@
                 @click="handleSearch"
                 style="width: 100%;"
               >
-                {{ loading ? '正在AI推理中...' : '🚀 开始检索' }}
+                {{ loading ? '正在推理中...' : '开始检索' }}
               </el-button>
             </div>
           </el-form>
@@ -88,9 +88,9 @@
               </div>
             </div>
             <div class="info-box">
-              <div class="main-info">ID: {{ item.vehicle_id }}</div>
-              <div class="sub-info">📷 {{ item.cam_id }}</div>
-              <div class="sub-info">🕒 {{ formatTime(item.capture_time) }}</div>
+              <div class="main-info">标识: {{ item.vehicle_id }}</div>
+              <div class="sub-info">机位: {{ item.cam_id }}</div>
+              <div class="sub-info">时间: {{ formatTime(item.capture_time) }}</div>
             </div>
           </el-card>
         </el-col>
@@ -106,10 +106,10 @@
 import { ref } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { searchVehicle } from '@/api/search'
+import { logout } from '@/api/auth'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 
-// 状态定义
 const loading = ref(false)
 const searched = ref(false)
 const topK = ref(10)
@@ -120,13 +120,6 @@ const results = ref([])
 const timeCost = ref(0)
 const router = useRouter()
 
-const handleLogout = () => {
-  localStorage.removeItem('access_token')
-  ElMessage.success('已安全退出系统')
-  router.push('/login')
-}
-
-// 1. 处理文件选择
 const handleFileChange = (uploadFile) => {
   file.value = uploadFile.raw
   previewUrl.value = URL.createObjectURL(uploadFile.raw)
@@ -134,10 +127,9 @@ const handleFileChange = (uploadFile) => {
   results.value = []
 }
 
-// 2. 触发检索
 const handleSearch = async () => {
   if (!file.value) {
-    ElMessage.warning('请先上传一张图片！')
+    ElMessage.warning('请先上传图片')
     return
   }
 
@@ -170,8 +162,20 @@ const getScoreClass = (score) => {
 }
 
 const formatTime = (timeStr) => {
-  if (!timeStr) return 'Unknown'
+  if (!timeStr) return '未知'
   return timeStr.replace('T', ' ')
+}
+
+const handleLogout = async () => {
+  try {
+    await logout()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    localStorage.removeItem('access_token')
+    ElMessage.success('已安全退出系统')
+    router.push('/login')
+  }
 }
 </script>
 

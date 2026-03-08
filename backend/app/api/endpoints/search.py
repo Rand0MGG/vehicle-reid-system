@@ -1,44 +1,39 @@
-# backend/app/api/endpoints/search.py
 import shutil
 import os
 import time
+from typing import Callable
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.services.search_service import SearchService
+from app.core.audit_logger import get_audit_logger
+from app.api.endpoints.auth import get_current_user
+from app.models.user import User
 
 router = APIRouter()
 
 @router.post("/search")
 async def search_vehicle(
     file: UploadFile = File(...),
-    top_k: int = Form(10),  # 允许前端指定返回几条，默认10
-    db: Session = Depends(get_db)
+    top_k: int = Form(10),
+    db: Session = Depends(get_db),
+    audit_logger: Callable = Depends(get_audit_logger),
+    current_user: User = Depends(get_current_user)
 ):
-    """
-    接收上传图片 -> 调用 SearchService -> 返回真实检索结果
-    """
-    # 1. 保存临时文件
-    # 确保 temp 目录存在
     os.makedirs("temp", exist_ok=True)
     temp_filename = f"temp/query_{int(time.time())}_{file.filename}"
     
     try:
         start_time = time.time()
-        
-        # 写入磁盘
         with open(temp_filename, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # 2. 初始化检索服务
         service = SearchService(db)
-        
-        # 3. 执行检索 (核心逻辑)
         results = service.search(img_path=temp_filename, top_k=top_k)
-        
         cost_time = time.time() - start_time
         
-        # 4. 构造标准返回格式
+        audit_logger(user_id=current_user.id, operation=f"执行车辆图像检索，返回 {len(results)} 条结果", status=True)
+        
         return {
             "code": 200,
             "message": "success",
@@ -50,11 +45,10 @@ async def search_vehicle(
         }
         
     except Exception as e:
-        print(f"❌ 检索出错: {str(e)}")
+        audit_logger(user_id=current_user.id, operation="车辆检索任务执行异常", status=False)
         return {"code": 500, "message": str(e)}
         
     finally:
-        # 5. 清理现场
         if os.path.exists(temp_filename):
             try:
                 os.remove(temp_filename)

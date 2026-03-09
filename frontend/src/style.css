@@ -1,79 +1,102 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none !important;
+  box-sizing: border-box;
+  background-color: #000000;
+  background-image: radial-gradient(circle at 15% 50%, rgba(20, 50, 80, 0.4), transparent 50%), 
+                    radial-gradient(circle at 85% 30%, rgba(50, 20, 60, 0.3), transparent 50%);
+  background-attachment: fixed;
+  color: #f5f5f7;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
-a {
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+:root {
+  --el-color-primary: #0a84ff;
+  --el-color-success: #32d74b;
+  --el-color-warning: #ffd60a;
+  --el-color-danger: #ff453a;
+  --el-color-info: #8e8e93;
+  --el-border-radius-base: 12px;
+  --el-border-radius-small: 8px;
+  --el-border-radius-round: 20px;
+  --el-border-color-lighter: rgba(255, 255, 255, 0.1);
+  --el-border-color: rgba(255, 255, 255, 0.15);
+  --el-fill-color-blank: rgba(30, 30, 30, 0.5);
+  --el-bg-color: rgba(28, 28, 30, 0.6);
+  --el-bg-color-overlay: rgba(44, 44, 46, 0.8);
+  --el-text-color-primary: #f5f5f7;
+  --el-text-color-regular: #ebebf5;
+  --el-text-color-secondary: #ebebf599;
+}
+
+.dark .el-card {
+  background: rgba(30, 30, 30, 0.65) !important;
+  backdrop-filter: blur(40px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark .el-button {
+  border-radius: 14px !important;
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
 }
 
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+.dark .el-button--primary {
+  background: var(--el-color-primary) !important;
+  border: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(10, 132, 255, 0.3) !important;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.dark .el-button--primary:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.dark .el-button--primary:active {
+  filter: brightness(0.9);
+  transform: scale(0.98);
 }
 
-.card {
-  padding: 2em;
+.dark .el-table {
+  background-color: transparent !important;
+  --el-table-border-color: rgba(255, 255, 255, 0.08);
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.05);
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.08);
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+.dark .el-table th.el-table__cell, .dark .el-table td.el-table__cell {
+  background-color: transparent !important;
+  border-bottom: 1px solid var(--el-table-border-color) !important;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.dark .el-input__wrapper, .dark .el-textarea__inner, .dark .el-select-dropdown {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  backdrop-filter: blur(20px);
+}
+
+.dark .el-dialog {
+  background: rgba(30, 30, 30, 0.75) !important;
+  backdrop-filter: blur(50px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(50px) saturate(200%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4) !important;
 }

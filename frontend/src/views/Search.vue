@@ -1,109 +1,117 @@
 <template>
-  <div class="search-container">
-    <div class="header">
-      <h2>车辆重识别检索系统</h2>
-      <p>上传目标车辆图片，在底库中检索同车轨迹</p>
+  <div class="search-layout">
+    <div class="macos-topbar">
+      <div class="topbar-left">
+        <span class="system-brand">计算机视觉项目检索终端</span>
+      </div>
+      <div class="topbar-right">
+        <el-button color="#ff453a" size="small" @click="handleLogout" class="apple-btn">断开安全连接</el-button>
+      </div>
     </div>
 
-    <el-card class="control-panel">
-      <el-row :gutter="20">
-        <el-col :span="10">
-          <el-upload
-            class="upload-demo"
-            drag
-            action="#"
-            :auto-upload="false"
-            :show-file-list="false"
-            :on-change="handleFileChange"
+    <div class="main-content">
+      <el-card shadow="never" class="apple-control-panel">
+        <el-row :gutter="32">
+          <el-col :span="11">
+            <el-upload
+              class="macos-upload"
+              drag
+              action="#"
+              :auto-upload="false"
+              :show-file-list="false"
+              :on-change="handleFileChange"
+            >
+              <div v-if="previewUrl" class="preview-box">
+                <img :src="previewUrl" class="preview-img" />
+                <div class="re-upload-glass-tip">触碰或拖拽替换目标图像</div>
+              </div>
+              <div v-else class="upload-placeholder">
+                <el-icon class="upload-icon"><upload-filled /></el-icon>
+                <div class="upload-text">
+                  拖拽二维图像至此区域 或 <span>点击装载</span>
+                </div>
+              </div>
+            </el-upload>
+          </el-col>
+
+          <el-col :span="13" class="action-col">
+            <el-form label-position="top" class="macos-form">
+              <el-form-item label="全局相似度截断截取量">
+                <el-slider v-model="topK" :min="1" :max="20" show-input />
+              </el-form-item>
+              
+              <el-form-item label="时间轴约束边界 (底层管线暂未贯通)">
+                <el-date-picker
+                  v-model="dateRange"
+                  type="datetimerange"
+                  range-separator="至"
+                  start-placeholder="起始采样点"
+                  end-placeholder="终止采样点"
+                  disabled
+                  class="macos-date-picker"
+                />
+              </el-form-item>
+
+              <div class="btn-group">
+                <el-button 
+                  type="primary" 
+                  size="large" 
+                  :loading="loading" 
+                  @click="handleSearch"
+                  class="apple-btn execute-btn"
+                >
+                  {{ loading ? '卷积神经网络特征提取运算中...' : '发起视觉相似度全库检索' }}
+                </el-button>
+              </div>
+            </el-form>
+          </el-col>
+        </el-row>
+      </el-card>
+
+      <div class="results-section" v-if="results.length > 0">
+        <div class="section-divider">
+          <span class="divider-text">底层检索序列返回 (运算开销: {{ timeCost }}s)</span>
+        </div>
+        
+        <el-row :gutter="24">
+          <el-col 
+            v-for="(item, index) in results" 
+            :key="index" 
+            :xs="12" :sm="8" :md="6" :lg="4"
           >
-            <div v-if="previewUrl" class="preview-box">
-              <img :src="previewUrl" class="preview-img" />
-              <div class="re-upload-tip">点击或拖拽替换图片</div>
-            </div>
-            <div v-else class="upload-placeholder">
-              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-              <div class="el-upload__text">
-                拖拽图片到此处 或 <em>点击上传</em>
+            <el-card shadow="never" :body-style="{ padding: '0px' }" class="apple-result-card">
+              <div class="image-wrapper">
+                <el-image 
+                  :src="item.img_url" 
+                  fit="cover" 
+                  class="result-img"
+                  :preview-src-list="[item.img_url]" 
+                  :initial-index="0"
+                  preview-teleported
+                  hide-on-click-modal
+                  lazy
+                />
+                <div class="glass-score-badge" :class="getScoreClass(item.score)">
+                  {{ (item.score * 100).toFixed(1) }}%
+                </div>
               </div>
-            </div>
-          </el-upload>
-        </el-col>
-
-        <el-col :span="14" class="action-col">
-          <el-form label-position="top">
-            <el-form-item label="期望结果数量">
-              <el-slider v-model="topK" :min="1" :max="20" show-input />
-            </el-form-item>
-            
-            <el-form-item label="时间范围 (暂未启用)">
-              <el-date-picker
-                v-model="dateRange"
-                type="datetimerange"
-                range-separator="至"
-                start-placeholder="开始时间"
-                end-placeholder="结束时间"
-                disabled
-              />
-            </el-form-item>
-
-            <div class="btn-group">
-              <el-button 
-                type="primary" 
-                size="large" 
-                :loading="loading" 
-                @click="handleSearch"
-                style="width: 100%;"
-              >
-                {{ loading ? '正在推理中...' : '开始检索' }}
-              </el-button>
-            </div>
-          </el-form>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <div class="results-section" v-if="results.length > 0">
-      <el-divider content-position="left">检索结果 (耗时: {{ timeCost }}s)</el-divider>
+              <div class="glass-info-box">
+                <div class="main-info">物理标识: {{ item.vehicle_id }}</div>
+                <div class="sub-info">采集终端: {{ item.cam_id }}</div>
+                <div class="sub-info">采样时间: {{ formatTime(item.capture_time) }}</div>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </div>
       
-      <el-row :gutter="20">
-        <el-col 
-          v-for="(item, index) in results" 
-          :key="index" 
-          :xs="12" :sm="8" :md="6" :lg="4"
-        >
-          <el-card :body-style="{ padding: '0px' }" class="result-card">
-            <div class="image-wrapper">
-              <el-image 
-                :src="item.img_url" 
-                fit="cover" 
-                class="result-img"
-                :preview-src-list="[item.img_url]" 
-                :initial-index="0"
-                preview-teleported
-                hide-on-click-modal
-                lazy
-              />
-              <div class="score-badge" :class="getScoreClass(item.score)">
-                {{ (item.score * 100).toFixed(1) }}%
-              </div>
-            </div>
-            <div class="info-box">
-              <div class="main-info">标识: {{ item.vehicle_id }}</div>
-              <div class="sub-info">机位: {{ item.cam_id }}</div>
-              <div class="sub-info">时间: {{ formatTime(item.capture_time) }}</div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
+      <el-empty v-else-if="searched" description="特征空间内未命中有价值的相似车辆序列" class="macos-empty" />
     </div>
-    
-    <el-empty v-else-if="searched" description="未找到相似车辆" />
-    <el-button type="danger" @click="handleLogout">退出系统</el-button>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { searchVehicle } from '@/api/search'
 import { logout } from '@/api/auth'
@@ -129,7 +137,7 @@ const handleFileChange = (uploadFile) => {
 
 const handleSearch = async () => {
   if (!file.value) {
-    ElMessage.warning('请先上传图片')
+    ElMessage.warning('目标物理图像缺失，阻断检索执行')
     return
   }
 
@@ -146,10 +154,9 @@ const handleSearch = async () => {
     timeCost.value = data.time_cost
     searched.value = true
     
-    ElMessage.success(`检索完成，耗时 ${data.time_cost}秒`)
+    ElMessage.success(`神经网络检索执行完成，总耗时 ${data.time_cost} 秒`)
     
   } catch (error) {
-    console.error(error)
   } finally {
     loading.value = false
   }
@@ -162,7 +169,7 @@ const getScoreClass = (score) => {
 }
 
 const formatTime = (timeStr) => {
-  if (!timeStr) return '未知'
+  if (!timeStr) return '状态未知'
   return timeStr.replace('T', ' ')
 }
 
@@ -170,67 +177,132 @@ const handleLogout = async () => {
   try {
     await logout()
   } catch (error) {
-    console.error(error)
   } finally {
     localStorage.removeItem('access_token')
-    ElMessage.success('已安全退出系统')
+    ElMessage.success('安全凭证已注销')
     router.push('/login')
   }
 }
+
+onMounted(() => {
+  document.documentElement.classList.add('dark')
+})
+
+onBeforeUnmount(() => {
+  document.documentElement.classList.remove('dark')
+})
 </script>
 
 <style scoped>
-.search-container {
+.search-layout {
+  height: 100vh; /* 关键修复：由 min-height 改为严格约束的 height，强制收束在视口内 */
+  display: flex;
+  flex-direction: column;
+  background-color: transparent;
+}
+
+.macos-topbar {
+  height: 56px;
+  background: rgba(30, 30, 30, 0.4);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  /* 移除 sticky 定位，改由 flex 布局自然接管 */
+  z-index: 100;
+}
+
+.main-content {
+  flex: 1; /* 占据剩余全部高度 */
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 32px 24px;
+  overflow-y: auto; /* 触发容器级独立滚动 */
 }
 
-.header {
-  text-align: center;
-  margin-bottom: 30px;
+/* 追加：苹果风格的沉浸式滚动条映射 */
+.main-content::-webkit-scrollbar {
+  width: 6px;
+}
+.main-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+.main-content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.header h2 {
-  color: #303133;
-  margin-bottom: 10px;
-  font-weight: 600;
+.apple-control-panel {
+  background: rgba(30, 30, 30, 0.5) !important;
+  border-radius: 24px !important;
+  margin-bottom: 40px;
+  padding: 10px;
 }
 
-.header p {
-  color: #606266;
-  font-size: 14px;
+.macos-upload :deep(.el-upload-dragger) {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
 }
 
-.control-panel {
-  margin-bottom: 30px;
+.macos-upload :deep(.el-upload-dragger:hover) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--el-color-primary);
 }
 
 .preview-box {
   position: relative;
   width: 100%;
-  height: 200px;
-  border-radius: 6px;
+  height: 100%;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px dashed #d9d9d9;
 }
 
 .preview-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  background-color: #f5f7fa;
+  object-fit: cover;
+  border-radius: 14px;
 }
 
-.re-upload-tip {
+.re-upload-glass-tip {
   position: absolute;
   bottom: 0;
   width: 100%;
-  background: rgba(0,0,0,0.5);
-  color: white;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #ffffff;
   text-align: center;
   font-size: 12px;
-  padding: 4px 0;
+  padding: 8px 0;
+  font-weight: 500;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #8e8e93;
+  margin-bottom: 16px;
+}
+
+.upload-text {
+  color: #ebebf5;
+  font-size: 14px;
+}
+
+.upload-text span {
+  color: var(--el-color-primary);
+  font-weight: 500;
 }
 
 .action-col {
@@ -239,19 +311,61 @@ const handleLogout = async () => {
   justify-content: center;
 }
 
-.result-card {
-  margin-bottom: 20px;
-  transition: transform 0.2s;
+.macos-form :deep(.el-form-item__label) {
+  color: #ebebf5;
+  font-weight: 500;
 }
 
-.result-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.macos-date-picker {
+  width: 100% !important;
+}
+
+.execute-btn {
+  width: 100%;
+  height: 50px;
+  font-size: 16px;
+  margin-top: 16px;
+  border-radius: 16px !important;
+}
+
+.section-divider {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.section-divider::before,
+.section-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.divider-text {
+  padding: 0 16px;
+  color: #8e8e93;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.apple-result-card {
+  background: rgba(30, 30, 30, 0.4) !important;
+  border-radius: 16px !important;
+  margin-bottom: 24px;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.apple-result-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3) !important;
 }
 
 .image-wrapper {
   position: relative;
-  height: 150px;
+  height: 160px;
+  width: 100%;
   background: #000;
 }
 
@@ -261,34 +375,44 @@ const handleLogout = async () => {
   display: block;
 }
 
-.score-badge {
+.glass-score-badge {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  top: 8px;
+  right: 8px;
+  padding: 4px 10px;
+  border-radius: 10px;
   color: white;
-  font-weight: bold;
+  font-weight: 600;
   font-size: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-.score-high { background-color: #67C23A; }
-.score-mid { background-color: #E6A23C; }
-.score-low { background-color: #F56C6C; }
+.score-high { background: rgba(50, 215, 75, 0.8); border: 1px solid rgba(50, 215, 75, 0.3); }
+.score-mid { background: rgba(255, 214, 10, 0.8); border: 1px solid rgba(255, 214, 10, 0.3); color: #000; }
+.score-low { background: rgba(255, 69, 58, 0.8); border: 1px solid rgba(255, 69, 58, 0.3); }
 
-.info-box {
-  padding: 10px;
+.glass-info-box {
+  padding: 12px 16px;
+  background: rgba(20, 20, 20, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .main-info {
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 5px;
+  font-weight: 600;
+  color: #f5f5f7;
+  font-size: 14px;
+  margin-bottom: 6px;
 }
 
 .sub-info {
   font-size: 12px;
-  color: #909399;
-  line-height: 1.4;
+  color: #8e8e93;
+  line-height: 1.5;
+}
+
+.macos-empty :deep(.el-empty__description) {
+  color: #8e8e93;
 }
 </style>

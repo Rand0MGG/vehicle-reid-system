@@ -38,15 +38,20 @@ def login_for_access_token(
 ):
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password):
-        user_id = user.id if user else 0
-        background_tasks.add_task(execute_audit_insertion, db, user_id, "系统登录失败", False)
+        user_id = user.id if user else None
+        
+        # 【关键修改】：抛出异常前，直接同步调用写入日志，不再使用 background_tasks
+        execute_audit_insertion(db, user_id, "系统登录失败", False)
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # 成功流没有异常，继续使用无阻塞的后台任务
     background_tasks.add_task(execute_audit_insertion, db, user.id, "系统登录成功", True)
+    
     access_token_expires = timedelta(minutes=access_token_expire_minutes)
     access_token = create_access_token(
         data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires

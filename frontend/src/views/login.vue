@@ -51,6 +51,7 @@ const handleLogin = async () => {
       try {
         const response = await login(loginForm.username, loginForm.password)
         localStorage.setItem('access_token', response.access_token)
+        localStorage.setItem('user_role', response.role)
         ElMessage.success('身份验证通过，正在接入检索管线')
         router.push('/search')
       } catch (error) {

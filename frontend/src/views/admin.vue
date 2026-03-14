@@ -455,6 +455,7 @@ const handleLogout = async () => {
   } catch (error) {
   } finally {
     localStorage.removeItem('access_token')
+    localStorage.removeItem('user_role')
     router.push('/login')
   }
 }

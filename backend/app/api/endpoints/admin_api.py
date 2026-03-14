@@ -9,6 +9,9 @@ from app.schemas.audit_schema import AuditLogResponse
 from app.core.security import get_password_hash
 from pydantic import BaseModel
 from app.services.gallery_service import run_sync_task, clear_gallery_db, sync_status
+from app.api.endpoints.auth import get_current_user
+
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 router = APIRouter()
 

@@ -2,9 +2,16 @@ __pycache__/
 *.pyc
 .idea/
 .vscode/
+*.pyd
+*.lib
+*.exp
+*.obj
+build/
 venv/
 reid_env/
 /outputs/
 /datasets/
 # 忽略包含密码的配置文件
 backend/app/core/config.py
+fastreid/datasets/
+fastreid/datasets_original/

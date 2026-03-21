@@ -3,34 +3,55 @@ _BASE_: ../Base-bagtricks.yml
 INPUT:
   SIZE_TRAIN: [256, 256]
   SIZE_TEST: [256, 256]
+  # 显式开启随机擦除与颜色抖动（应对遮挡与光照复杂场景）
+  REA:
+    ENABLED: True
+  CJ:
+    ENABLED: True
 
 MODEL:
   BACKBONE:
     WITH_IBN: True
   HEADS:
+    # 升级为 GeM 池化
     POOL_LAYER: GeneralizedMeanPooling
 
   LOSSES:
+    # 明确联合损失函数
+    NAME: ("CrossEntropyLoss", "TripletLoss")
     TRI:
-      HARD_MINING: False
-      MARGIN: 0.0
+      # 开启难样本挖掘
+      HARD_MINING: True
+      # 适当增加 Margin，逼迫网络将不同车辆的特征推得更远
+      MARGIN: 0.3 
 
 DATASETS:
-  NAMES: ("VehicleID",)
-  TESTS: ("SmallVehicleID", "MediumVehicleID", "LargeVehicleID",)
+  # 挂载我们第一阶段解析好的数据集
+  NAMES: ("VeRi",)
+  TESTS: ("VeRi",)
 
 SOLVER:
   BIAS_LR_FACTOR: 1.
-
-  IMS_PER_BATCH: 512
+  
+  # === 显存拯救外挂 ===
+  # 开启 FP16 自动混合精度，这是跑 128 Batch Size 的底气
+  AMP:
+    ENABLED: False
+  
+  # === 激进采样策略 ===
+  # 32 (不同车辆) × 4 (单车视角) = 128
+  IMS_PER_BATCH: 64 
+  
+  WARMUP_ITERS: 1000
   MAX_EPOCH: 60
   STEPS: [30, 50]
-  WARMUP_ITERS: 2000
 
-  CHECKPOINT_PERIOD: 20
+  CHECKPOINT_PERIOD: 1000
 
 TEST:
   EVAL_PERIOD: 20
-  IMS_PER_BATCH: 128
+  # 测试阶段不计算梯度，128 的 Batch Size 毫无压力
+  IMS_PER_BATCH: 128 
 
-OUTPUT_DIR: logs/vehicleid/bagtricks_R50-ibn_4gpu
+# 输出路径重定向到项目根目录的 outputs 文件夹下
+OUTPUT_DIR: E:/reid/outputs/veri_bagtricks_R50_ibn

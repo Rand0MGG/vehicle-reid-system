@@ -1,3 +1,12 @@
+import collections
+# 针对 Python 3.10+ 的兼容性补丁
+if not hasattr(collections, 'Mapping'):
+    import collections.abc
+    collections.Mapping = collections.abc.Mapping
+if not hasattr(collections, 'Iterable'):
+    import collections.abc
+    collections.Iterable = collections.abc.Iterable
+
 import uvicorn
 import os
 from fastapi import FastAPI

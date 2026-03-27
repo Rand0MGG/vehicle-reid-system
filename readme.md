@@ -26,16 +26,16 @@ It supports a practical workflow:
 
 ```mermaid
 flowchart LR
-  U[User] -->|Browser| FE[Frontend (Vue3)]
-  FE -->|HTTP| BE[Backend (FastAPI)]
+  U["User"] -->|Browser| FE["Frontend<br/>Vue 3"]
+  FE -->|HTTP| BE["Backend<br/>FastAPI"]
 
-  subgraph Backend
-    AUTH[Auth API\nJWT]
-    ADMIN[Admin API\nUsers/Logs/Config/Gallery]
-    SEARCH[Search API\nUpload -> Top-K]
-    SVC1[SearchService\nCosine similarity]
-    SVC2[GalleryService\nScan & ingest gallery]
-    STATIC[Static Server\n/static -> datasets/]
+  subgraph B["Backend Services"]
+    AUTH["Auth API<br/>JWT"]
+    ADMIN["Admin API<br/>Users / Logs / Config / Gallery"]
+    SEARCH["Search API<br/>Upload to Top-K"]
+    SVC1["SearchService<br/>Cosine Similarity"]
+    SVC2["GalleryService<br/>Scan and Ingest Gallery"]
+    STATIC["Static Server<br/>/static maps to datasets/"]
   end
 
   BE --> AUTH
@@ -46,13 +46,13 @@ flowchart LR
   SEARCH --> SVC1
   ADMIN --> SVC2
 
-  SVC1 --> ENGINE[ReID Engine\nreid_engine.extract_feature]
+  SVC1 --> ENGINE["ReID Engine<br/>reid_engine.extract_feature"]
   SVC2 --> ENGINE
 
-  SVC1 --> DB[(MySQL\nvehicle_feature/sys_user/sys_log)]
+  SVC1 --> DB[("MySQL<br/>vehicle_feature / sys_user / sys_log")]
   SVC2 --> DB
 
-  SVC2 --> FS[(datasets/gallery\nimages)]
+  SVC2 --> FS[("datasets/gallery<br/>images")]
   STATIC --> FS
 ```
 
@@ -229,12 +229,12 @@ The config describes a **Baseline** meta-architecture consisting of:
 
 ```mermaid
 flowchart LR
-  IN[Input Image\n256x256] --> BB[Backbone\nResNet-50]
-  BB --> POOL[Pooling\nGeM]
-  POOL --> NECK[Neck\n(NECK_FEAT=after)]
-  NECK --> EMB[Embedding Feature\n(embedding vector)]
-  EMB -->|train only| CLS[CircleSoftmax\nclassification]
-  EMB -->|inference| SIM[Cosine similarity\nSearchService]
+  IN["Input Image<br/>256 x 256"] --> BB["Backbone<br/>ResNet-50"]
+  BB --> POOL["Pooling<br/>GeM"]
+  POOL --> NECK["Neck<br/>NECK_FEAT = after"]
+  NECK --> EMB["Embedding Feature<br/>Embedding Vector"]
+  EMB -->|Train Only| CLS["CircleSoftmax<br/>Classification"]
+  EMB -->|Inference| SIM["Cosine Similarity<br/>SearchService"]
 ```
 
 ---
@@ -611,16 +611,16 @@ Vehicle ReID System 是一个端到端 **车辆重识别** 演示系统，组合
 
 ```mermaid
 flowchart LR
-  U[User] -->|Browser| FE[Frontend (Vue3)]
-  FE -->|HTTP| BE[Backend (FastAPI)]
+  U["User"] -->|Browser| FE["Frontend<br/>Vue 3"]
+  FE -->|HTTP| BE["Backend<br/>FastAPI"]
 
-  subgraph Backend
-    AUTH[Auth API\nJWT]
-    ADMIN[Admin API\nUsers/Logs/Config/Gallery]
-    SEARCH[Search API\nUpload -> Top-K]
-    SVC1[SearchService\nCosine similarity]
-    SVC2[GalleryService\nScan & ingest gallery]
-    STATIC[Static Server\n/static -> datasets/]
+  subgraph B["Backend Services"]
+    AUTH["Auth API<br/>JWT"]
+    ADMIN["Admin API<br/>Users / Logs / Config / Gallery"]
+    SEARCH["Search API<br/>Upload to Top-K"]
+    SVC1["SearchService<br/>Cosine Similarity"]
+    SVC2["GalleryService<br/>Scan and Ingest Gallery"]
+    STATIC["Static Server<br/>/static maps to datasets/"]
   end
 
   BE --> AUTH
@@ -631,13 +631,13 @@ flowchart LR
   SEARCH --> SVC1
   ADMIN --> SVC2
 
-  SVC1 --> ENGINE[ReID Engine\nreid_engine.extract_feature]
+  SVC1 --> ENGINE["ReID Engine<br/>reid_engine.extract_feature"]
   SVC2 --> ENGINE
 
-  SVC1 --> DB[(MySQL\nvehicle_feature/sys_user/sys_log)]
+  SVC1 --> DB[("MySQL<br/>vehicle_feature / sys_user / sys_log")]
   SVC2 --> DB
 
-  SVC2 --> FS[(datasets/gallery\nimages)]
+  SVC2 --> FS[("datasets/gallery<br/>images")]
   STATIC --> FS
 ```
 
@@ -814,12 +814,12 @@ datasets/
 
 ```mermaid
 flowchart LR
-  IN[Input Image\n256x256] --> BB[Backbone\nResNet-50]
-  BB --> POOL[Pooling\nGeM]
-  POOL --> NECK[Neck\n(NECK_FEAT=after)]
-  NECK --> EMB[Embedding Feature\n(embedding vector)]
-  EMB -->|train only| CLS[CircleSoftmax\nclassification]
-  EMB -->|inference| SIM[Cosine similarity\nSearchService]
+  IN["Input Image<br/>256 x 256"] --> BB["Backbone<br/>ResNet-50"]
+  BB --> POOL["Pooling<br/>GeM"]
+  POOL --> NECK["Neck<br/>NECK_FEAT = after"]
+  NECK --> EMB["Embedding Feature<br/>Embedding Vector"]
+  EMB -->|Train Only| CLS["CircleSoftmax<br/>Classification"]
+  EMB -->|Inference| SIM["Cosine Similarity<br/>SearchService"]
 ```
 
 ---

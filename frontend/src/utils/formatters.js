@@ -1,0 +1,76 @@
+export function formatDateTime(value) {
+  if (!value) {
+    return '未知'
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().replace('T', ' ').slice(0, 19)
+  }
+
+  if (typeof value === 'string') {
+    return value.replace('T', ' ').slice(0, 19)
+  }
+
+  return String(value)
+}
+
+export function formatDuration(value) {
+  const seconds = Number(value)
+
+  if (!Number.isFinite(seconds)) {
+    return '--'
+  }
+
+  if (seconds < 1) {
+    return `${seconds.toFixed(2)} 秒`
+  }
+
+  if (seconds < 10) {
+    return `${seconds.toFixed(1)} 秒`
+  }
+
+  return `${Math.round(seconds * 10) / 10} 秒`
+}
+
+export function normalizeModelMeta(payload = {}) {
+  const currentModel = payload.current_model_file || ''
+  const defaultModel = payload.default_model_file || currentModel
+
+  return {
+    current: currentModel,
+    default: defaultModel,
+    device: payload.model_device || '未知',
+    initialized: Boolean(payload.initialized),
+    availableModels: Array.isArray(payload.available_models) ? payload.available_models : []
+  }
+}
+
+export function normalizeSearchResults(items = []) {
+  if (!Array.isArray(items)) {
+    return []
+  }
+
+  return items.map((item) => ({
+    img_url: item?.img_url || '',
+    vehicle_id: item?.vehicle_id || '未标注车辆',
+    cam_id: item?.cam_id || '未知摄像头',
+    capture_time: item?.capture_time || '',
+    score: Number.isFinite(Number(item?.score)) ? Number(item.score) : 0
+  }))
+}
+
+export function getScoreTone(score) {
+  if (score >= 0.8) {
+    return 'high'
+  }
+
+  if (score >= 0.5) {
+    return 'mid'
+  }
+
+  return 'low'
+}
+
+export function getRoleLabel(role) {
+  return role === 'admin' ? '管理员' : '普通用户'
+}

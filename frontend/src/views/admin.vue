@@ -218,7 +218,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { fetchAuditLogs, syncGalleryData, clearGalleryData, rebuildGalleryData, fetchGalleryStatus, fetchUserList, createNewUser, removeUser, fetchSystemStats, fetchSysConfig, updateSysConfig } from '@/api/admin'
+import { fetchAuditLogs, syncGalleryData, clearGalleryData, rebuildGalleryData, fetchGalleryStatus, fetchUserList, createNewUser, removeUser, fetchSystemStats, fetchSysConfig, updateSysConfig, fetchModelFiles, selectModelFile } from '@/api/admin'
 import { logout } from '@/api/auth'
 
 const router = useRouter()
@@ -239,6 +239,7 @@ const loadingUsers = ref(false)
 const loadingStats = ref(false)
 const loadingConfig = ref(false)
 const savingConfig = ref(false)
+const loadingModels = ref(false)
 
 const logList = ref([])
 const totalLogs = ref(0)
@@ -264,8 +265,10 @@ const sysConfig = reactive({
   model_device: 'cpu',
   similarity_threshold: 0.5,
   max_results: 50,
-  log_level: 'INFO'
+  log_level: 'INFO',
+  current_model_file: ''
 })
+const modelFiles = ref([])
 
 const isEngineRunning = ref(false)
 const engineLogs = ref([])

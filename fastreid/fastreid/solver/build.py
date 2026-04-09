@@ -177,7 +177,7 @@ def maybe_add_freeze_layer(
         return OptimizerWithFreezeLayer
 
 
-def build_optimizer(cfg, model, contiguous=True):
+def build_optimizer(cfg, model, contiguous=False):
     params = get_default_optimizer_params(
         model,
         base_lr=cfg.SOLVER.BASE_LR,

@@ -1,12 +1,3 @@
-import collections
-# 针对 Python 3.10+ 的兼容性补丁
-if not hasattr(collections, 'Mapping'):
-    import collections.abc
-    collections.Mapping = collections.abc.Mapping
-if not hasattr(collections, 'Iterable'):
-    import collections.abc
-    collections.Iterable = collections.abc.Iterable
-
 #!/usr/bin/env python
 # encoding: utf-8
 """
@@ -14,9 +5,12 @@ if not hasattr(collections, 'Iterable'):
 @contact: sherlockliao01@gmail.com
 """
 
+import os
 import sys
 
-sys.path.append('.')
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_FASTREID_DIR = os.path.dirname(TOOLS_DIR)
+sys.path.insert(0, PROJECT_FASTREID_DIR)
 
 from fastreid.config import get_cfg
 from fastreid.engine import DefaultTrainer, default_argument_parser, default_setup, launch

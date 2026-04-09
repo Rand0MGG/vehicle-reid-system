@@ -12,7 +12,9 @@ from collections import OrderedDict
 import torch
 from torch.nn.parallel import DistributedDataParallel
 
-sys.path.append('.')
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_FASTREID_DIR = os.path.dirname(TOOLS_DIR)
+sys.path.insert(0, PROJECT_FASTREID_DIR)
 
 from fastreid.config import get_cfg
 from fastreid.data import build_reid_test_loader, build_reid_train_loader

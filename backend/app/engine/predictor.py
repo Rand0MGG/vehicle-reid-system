@@ -1,6 +1,7 @@
 # backend/app/engine/predictor.py
 import sys
 import os
+from pathlib import Path
 import cv2
 import torch
 import numpy as np
@@ -20,9 +21,67 @@ except ImportError as e:
     sys.exit(1)
 
 from app.core.config import settings
+from app.core.model_preferences import get_default_model_file
 
 class ReIDEngine:
     def __init__(self):
+        self.model = None
+        self.transforms = None
+        self.device = None
+        self.initialized = False
+        self.outputs_dir = Path(settings.BASE_DIR).joinpath("../outputs").resolve()
+        preferred_model = get_default_model_file()
+        default_weights = preferred_model or settings.MODEL_WEIGHTS_FILE
+        self.weights_file = self._resolve_weights_file(default_weights)
+        self.device_name = settings.DEVICE
+
+    def _resolve_weights_file(self, weights_file: str | None = None) -> Path:
+        if not weights_file:
+            return self.weights_file.resolve()
+
+        candidate = Path(weights_file)
+        if not candidate.is_absolute():
+            candidate = self.outputs_dir.joinpath(candidate)
+
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(self.outputs_dir)
+        except ValueError as exc:
+            raise ValueError("Model weights must be inside the outputs directory") from exc
+        return resolved
+
+    def list_weight_files(self):
+        if not self.outputs_dir.exists():
+            return []
+
+        files = []
+        for pattern in ("*.pth", "*.pt"):
+            for file_path in self.outputs_dir.rglob(pattern):
+                files.append(file_path.relative_to(self.outputs_dir).as_posix())
+        return sorted(set(files))
+
+    def get_current_weight_file(self):
+        try:
+            return self.weights_file.relative_to(self.outputs_dir).as_posix()
+        except ValueError:
+            return str(self.weights_file)
+
+    def configure(self, weights_file: str | None = None, device: str | None = None, eager: bool = False):
+        next_weights_file = self._resolve_weights_file(weights_file)
+        next_device = device or self.device_name
+
+        if next_device not in {"cpu", "cuda"}:
+            raise ValueError("Model device must be cpu or cuda")
+        if next_device == "cuda" and not torch.cuda.is_available():
+            raise ValueError("CUDA is unavailable in the current environment")
+
+        self.weights_file = next_weights_file
+        self.device_name = next_device
+        self.reset()
+        if eager:
+            self.setup()
+
+    def reset(self):
         self.model = None
         self.transforms = None
         self.device = None
@@ -40,17 +99,18 @@ class ReIDEngine:
         # 1. 配置准备
         cfg = get_cfg()
         cfg.merge_from_file(settings.MODEL_CONFIG_FILE)
-        cfg.MODEL.WEIGHTS = settings.MODEL_WEIGHTS_FILE
-        cfg.MODEL.DEVICE = settings.DEVICE
+        cfg.MODEL.BACKBONE.PRETRAIN = False
+        cfg.MODEL.WEIGHTS = str(self.weights_file)
+        cfg.MODEL.DEVICE = self.device_name
         
         # 2. 构建模型结构
         self.model = build_model(cfg)
         self.model.eval() # 切换到评估模式
         
         # 3. 加载权重
-        if os.path.exists(settings.MODEL_WEIGHTS_FILE):
-            Checkpointer(self.model).load(settings.MODEL_WEIGHTS_FILE)
-            print(f"   - 权重已加载: {settings.MODEL_WEIGHTS_FILE}")
+        if self.weights_file.exists():
+            Checkpointer(self.model).load(str(self.weights_file))
+            print(f"   - 权重已加载: {self.weights_file}")
         else:
             print(f"⚠️ 警告: 找不到权重文件，使用随机参数！")
 

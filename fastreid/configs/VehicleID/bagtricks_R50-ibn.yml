@@ -3,55 +3,34 @@ _BASE_: ../Base-bagtricks.yml
 INPUT:
   SIZE_TRAIN: [256, 256]
   SIZE_TEST: [256, 256]
-  REA:
-    ENABLED: True
-  CJ:
-    ENABLED: True
 
 MODEL:
   BACKBONE:
-    # 保留 IBN 结构以获取高泛化能力
     WITH_IBN: True
-    # 论文 Trick：保留大尺寸特征图
-    LAST_STRIDE: 1
   HEADS:
-    # 绝对安全的线性池化
-    POOL_LAYER: GlobalAvgPool
+    POOL_LAYER: GeneralizedMeanPooling
 
   LOSSES:
-    NAME: ("CrossEntropyLoss", "TripletLoss")
     TRI:
-      HARD_MINING: True
-      MARGIN: 0.3 
-      NORM_FEAT: False
+      HARD_MINING: False
+      MARGIN: 0.0
 
 DATASETS:
-  NAMES: ("VeRi",)
-  TESTS: ("VeRi",)
+  NAMES: ("VehicleID",)
+  TESTS: ("SmallVehicleID", "MediumVehicleID", "LargeVehicleID",)
 
 SOLVER:
   BIAS_LR_FACTOR: 1.
-  
-  # === 彻底拔掉引发崩溃的 AMP ===
-  AMP:
-    ENABLED: False
-  
-  # === 匹配纯 FP32 的显存开销与学习率 ===
-  IMS_PER_BATCH: 64  
-  BASE_LR: 0.001
 
-  # 无需额外护甲，GlobalAvgPool 原生极其稳定
-  FREEZE_ITERS: 0
-  CLIP_GRADIENTS:
-    ENABLED: False
-  
-  WARMUP_ITERS: 1000
+  IMS_PER_BATCH: 512
   MAX_EPOCH: 60
   STEPS: [30, 50]
-  CHECKPOINT_PERIOD: 10
+  WARMUP_ITERS: 2000
+
+  CHECKPOINT_PERIOD: 20
 
 TEST:
-  EVAL_PERIOD: 5
-  IMS_PER_BATCH: 128 
+  EVAL_PERIOD: 20
+  IMS_PER_BATCH: 128
 
-OUTPUT_DIR: E:/reid/outputs/veri_bagtricks_R50_ibn
+OUTPUT_DIR: logs/vehicleid/bagtricks_R50-ibn_4gpu

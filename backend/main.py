@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.endpoints import search, auth, admin_api
+from app.api.endpoints import search, auth, admin_api, model_admin
 from app.engine.predictor import reid_engine
 
 app = FastAPI(title=settings.PROJECT_NAME)
@@ -35,6 +35,7 @@ app.mount("/static", StaticFiles(directory=datasets_dir), name="static")
 app.include_router(search.router, prefix=settings.API_V1_STR)
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(admin_api.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
+app.include_router(model_admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
 
 @app.on_event("startup")
 async def startup_event():

@@ -32,6 +32,14 @@ export function updateSysConfig(data) {
   return request({ url: '/admin/config', method: 'post', data })
 }
 
+export function fetchModelFiles() {
+  return request({ url: '/admin/models', method: 'get' })
+}
+
+export function selectModelFile(data) {
+  return request({ url: '/admin/models/select', method: 'post', data })
+}
+
 export function fetchUserList() {
   return request({ url: '/admin/users', method: 'get' })
 }

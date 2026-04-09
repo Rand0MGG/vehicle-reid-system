@@ -135,9 +135,17 @@ class ReidEvaluator(DatasetEvaluator):
                 start_time = time.time()
                 logger.info("> compiling reid evaluation cython tool")
 
-                compile_helper()
+                compiled = compile_helper()
 
-                logger.info(
-                    ">>> done with reid evaluation cython tool. Compilation time: {:.3f} "
-                    "seconds".format(time.time() - start_time))
+                if compiled:
+                    logger.info(
+                        ">>> done with reid evaluation cython tool. Compilation time: {:.3f} "
+                        "seconds".format(time.time() - start_time))
+                else:
+                    logger.warning(
+                        ">>> cython reid evaluation tool is unavailable. "
+                        "Falling back to python evaluation. Elapsed: {:.3f} seconds".format(
+                            time.time() - start_time
+                        )
+                    )
         comm.synchronize()

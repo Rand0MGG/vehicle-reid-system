@@ -1,419 +1,302 @@
-<template>
-  <div class="search-layout">
-    <div class="macos-topbar">
-      <div class="topbar-left">
-        <span class="system-brand">计算机视觉项目检索终端</span>
-      </div>
-      <div class="topbar-right">
-        <el-button color="#ff453a" size="small" @click="handleLogout" class="apple-btn">断开安全连接</el-button>
-      </div>
-    </div>
-
-    <div class="main-content">
-      <el-card shadow="never" class="apple-control-panel">
-        <el-row :gutter="32">
-          <el-col :span="11">
-            <el-upload
-              class="macos-upload"
-              drag
-              action="#"
-              :auto-upload="false"
-              :show-file-list="false"
-              :on-change="handleFileChange"
-            >
-              <div v-if="previewUrl" class="preview-box">
-                <img :src="previewUrl" class="preview-img" />
-                <div class="re-upload-glass-tip">触碰或拖拽替换目标图像</div>
-              </div>
-              <div v-else class="upload-placeholder">
-                <el-icon class="upload-icon"><upload-filled /></el-icon>
-                <div class="upload-text">
-                  拖拽二维图像至此区域 或 <span>点击装载</span>
-                </div>
-              </div>
-            </el-upload>
-          </el-col>
-
-          <el-col :span="13" class="action-col">
-            <el-form label-position="top" class="macos-form">
-              <el-form-item label="全局相似度截断截取量">
-                <el-slider v-model="topK" :min="1" :max="20" show-input />
-              </el-form-item>
-              
-              <el-form-item label="时间轴约束边界 (底层管线暂未贯通)">
-                <el-date-picker
-                  v-model="dateRange"
-                  type="datetimerange"
-                  range-separator="至"
-                  start-placeholder="起始采样点"
-                  end-placeholder="终止采样点"
-                  disabled
-                  class="macos-date-picker"
-                />
-              </el-form-item>
-
-              <div class="btn-group">
-                <el-button 
-                  type="primary" 
-                  size="large" 
-                  :loading="loading" 
-                  @click="handleSearch"
-                  class="apple-btn execute-btn"
-                >
-                  {{ loading ? '卷积神经网络特征提取运算中...' : '发起视觉相似度全库检索' }}
-                </el-button>
-              </div>
-            </el-form>
-          </el-col>
-        </el-row>
-      </el-card>
-
-      <div class="results-section" v-if="results.length > 0">
-        <div class="section-divider">
-          <span class="divider-text">底层检索序列返回 (运算开销: {{ timeCost }}s)</span>
+﻿<template>
+  <div class="app-page">
+    <div class="app-shell">
+      <section class="search-header">
+        <div class="search-copy">
+          <p class="search-eyebrow">Vehicle ReID Frontend</p>
+          <h1>车辆检索前台</h1>
+          <p class="search-description">
+            上传查询图像后即可开始检索。模型切换由管理员统一处理，前台只保留必要的检索参数与结果展示。
+          </p>
         </div>
-        
-        <el-row :gutter="24">
-          <el-col 
-            v-for="(item, index) in results" 
-            :key="index" 
-            :xs="12" :sm="8" :md="6" :lg="4"
-          >
-            <el-card shadow="never" :body-style="{ padding: '0px' }" class="apple-result-card">
-              <div class="image-wrapper">
-                <el-image 
-                  :src="item.img_url" 
-                  fit="cover" 
-                  class="result-img"
-                  :preview-src-list="[item.img_url]" 
-                  :initial-index="0"
-                  preview-teleported
-                  hide-on-click-modal
-                  lazy
-                />
-                <div class="glass-score-badge" :class="getScoreClass(item.score)">
-                  {{ (item.score * 100).toFixed(1) }}%
-                </div>
-              </div>
-              <div class="glass-info-box">
-                <div class="main-info">物理标识: {{ item.vehicle_id }}</div>
-                <div class="sub-info">采集终端: {{ item.cam_id }}</div>
-                <div class="sub-info">采样时间: {{ formatTime(item.capture_time) }}</div>
-              </div>
-            </el-card>
-          </el-col>
-        </el-row>
+
+        <div class="search-side">
+          <div class="header-meta">
+            <span class="app-chip">当前身份 <strong>{{ roleLabel }}</strong></span>
+            <span class="app-chip">运行设备 <strong>{{ modelState.device || '未知' }}</strong></span>
+          </div>
+
+          <div class="header-actions">
+            <el-button v-if="isAdmin" plain @click="router.push('/admin')">进入后台</el-button>
+            <el-button @click="handleLogout">退出登录</el-button>
+          </div>
+        </div>
+      </section>
+
+      <StatusBanner
+        v-if="modelErrorMessage"
+        tone="danger"
+        title="模型信息读取失败"
+        :message="modelErrorMessage"
+      />
+
+      <StatusBanner
+        v-if="searchBlocked"
+        tone="warning"
+        title="当前模型与图库特征模型不一致"
+        message="当前检索已暂时停用，请联系管理员在后台重新处理全部图片后再继续检索。"
+      />
+
+      <StatusBanner :tone="feedback.tone" :title="feedback.title" :message="feedback.message" />
+
+      <div class="workspace-grid">
+        <QueryUploadPanel
+          :file-name="currentFileName"
+          :preview-url="previewUrl"
+          @file-change="handleFileChange"
+          @reset="resetQuery"
+        />
+
+        <SectionCard
+          eyebrow="Search"
+          title="设置检索参数"
+          description="当前前台只开放返回结果数量设置，模型由管理员统一维护。"
+        >
+          <div class="parameter-stats">
+            <StatCard
+              label="当前模型"
+              :value="modelState.current || '尚未读取到模型'"
+              hint="当前检索正在使用的模型文件"
+              mono
+            />
+            <StatCard
+              label="图库特征模型"
+              :value="modelState.gallery || '尚未记录'"
+              hint="当前图库中的特征数据由这个模型计算得到"
+              mono
+            />
+            <StatCard
+              label="最近耗时"
+              :value="searched ? formatDuration(timeCost) : '--'"
+              hint="完成一次检索后更新"
+            />
+          </div>
+
+          <el-form label-position="top" class="parameter-form">
+            <el-form-item label="返回结果数量">
+              <el-slider v-model="topK" :min="1" :max="20" show-input />
+            </el-form-item>
+
+            <el-form-item label="时间范围过滤">
+              <el-date-picker
+                v-model="dateRange"
+                type="datetimerange"
+                range-separator="至"
+                start-placeholder="开始时间"
+                end-placeholder="结束时间"
+                disabled
+              />
+            </el-form-item>
+          </el-form>
+
+          <div class="helper-note">
+            <strong>当前可调整内容</strong>
+            <p>当前前台只允许调整返回结果数量。时间范围过滤暂未启用，只保留界面位置。</p>
+          </div>
+
+          <ActionBar align="left">
+            <el-button type="primary" :loading="loading" :disabled="searchBlocked" @click="handleSearch">
+              {{ loading ? '正在执行检索...' : '开始检索' }}
+            </el-button>
+            <el-button plain :disabled="!currentFileName" @click="resetQuery">重置当前查询</el-button>
+          </ActionBar>
+        </SectionCard>
       </div>
-      
-      <el-empty v-else-if="searched" description="特征空间内未命中有价值的相似车辆序列" class="macos-empty" />
+
+      <ResultGrid :results="results" :searched="searched" :loading="loading" :time-cost="timeCost" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { UploadFilled } from '@element-plus/icons-vue'
-import { searchVehicle } from '@/api/search'
-import { logout } from '@/api/auth'
-import { ElMessage } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import ActionBar from '@/components/base/ActionBar.vue'
+import SectionCard from '@/components/base/SectionCard.vue'
+import StatCard from '@/components/base/StatCard.vue'
+import StatusBanner from '@/components/base/StatusBanner.vue'
+import QueryUploadPanel from '@/components/search/QueryUploadPanel.vue'
+import ResultGrid from '@/components/search/ResultGrid.vue'
+import { useModelMeta } from '@/composables/useModelMeta'
+import { useSearchWorkflow } from '@/composables/useSearchWorkflow'
+import { useSession } from '@/composables/useSession'
+import { formatDuration, getRoleLabel } from '@/utils/formatters'
 
-const loading = ref(false)
-const searched = ref(false)
-const topK = ref(10)
-const dateRange = ref([])
-const file = ref(null)
-const previewUrl = ref('')
-const results = ref([])
-const timeCost = ref(0)
 const router = useRouter()
+const { role, isAdmin, syncSession, logoutAndRedirect } = useSession(router)
+const {
+  loading,
+  searched,
+  topK,
+  dateRange,
+  file,
+  previewUrl,
+  results,
+  timeCost,
+  feedback,
+  handleFileChange,
+  resetQuery,
+  executeSearch,
+  cleanup
+} = useSearchWorkflow()
+const {
+  errorMessage: modelErrorMessage,
+  modelState,
+  loadModelMeta
+} = useModelMeta()
 
-const handleFileChange = (uploadFile) => {
-  file.value = uploadFile.raw
-  previewUrl.value = URL.createObjectURL(uploadFile.raw)
-  searched.value = false
-  results.value = []
+const roleLabel = computed(() => getRoleLabel(role.value))
+const currentFileName = computed(() => file.value?.name || '')
+const searchBlocked = computed(
+  () => Boolean(modelState.value.gallery) && !modelState.value.galleryMatchesCurrent
+)
+
+const loadSearchContext = async () => {
+  try {
+    await loadModelMeta()
+  } catch {
+    // Inline banner already describes the failure state.
+  }
 }
 
 const handleSearch = async () => {
-  if (!file.value) {
-    ElMessage.warning('目标物理图像缺失，阻断检索执行')
-    return
-  }
-
-  loading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', file.value)
-    formData.append('top_k', topK.value)
-    
-    const res = await searchVehicle(formData)
-    
-    const { data } = res
-    results.value = data.results
-    timeCost.value = data.time_cost
-    searched.value = true
-    
-    ElMessage.success(`神经网络检索执行完成，总耗时 ${data.time_cost} 秒`)
-    
-  } catch (error) {
-  } finally {
-    loading.value = false
+    const response = await executeSearch()
+
+    if (response) {
+      ElMessage.success(`检索完成，共返回 ${response.total_found} 条结果。`)
+    }
+  } catch {
+    // Error state is shown inline and by the request layer.
   }
-}
-
-const getScoreClass = (score) => {
-  if (score > 0.8) return 'score-high'
-  if (score > 0.5) return 'score-mid'
-  return 'score-low'
-}
-
-const formatTime = (timeStr) => {
-  if (!timeStr) return '状态未知'
-  return timeStr.replace('T', ' ')
 }
 
 const handleLogout = async () => {
-  try {
-    await logout()
-  } catch (error) {
-  } finally {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user_role')
-    ElMessage.success('安全凭证已注销')
-    router.push('/login')
-  }
+  await logoutAndRedirect()
+  ElMessage.success('已退出登录。')
 }
 
 onMounted(() => {
-  document.documentElement.classList.add('dark')
+  syncSession()
+  loadSearchContext()
 })
 
 onBeforeUnmount(() => {
-  document.documentElement.classList.remove('dark')
+  cleanup()
 })
 </script>
 
 <style scoped>
-.search-layout {
-  height: 100vh; /* 关键修复：由 min-height 改为严格约束的 height，强制收束在视口内 */
-  display: flex;
-  flex-direction: column;
-  background-color: transparent;
+.search-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  padding: 24px 28px;
+  border: 1px solid var(--border-soft);
+  border-radius: 28px;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-whisper);
 }
 
-.macos-topbar {
-  height: 56px;
-  background: rgba(30, 30, 30, 0.4);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  /* 移除 sticky 定位，改由 flex 布局自然接管 */
-  z-index: 100;
+.search-copy h1 {
+  margin: 10px 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 4vw, 48px);
+  font-weight: 500;
+  line-height: 1.08;
 }
 
-.main-content {
-  flex: 1; /* 占据剩余全部高度 */
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 24px;
-  overflow-y: auto; /* 触发容器级独立滚动 */
-}
-
-/* 追加：苹果风格的沉浸式滚动条映射 */
-.main-content::-webkit-scrollbar {
-  width: 6px;
-}
-.main-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-.main-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.apple-control-panel {
-  background: rgba(30, 30, 30, 0.5) !important;
-  border-radius: 24px !important;
-  margin-bottom: 40px;
-  padding: 10px;
-}
-
-.macos-upload :deep(.el-upload-dragger) {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  height: 220px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.macos-upload :deep(.el-upload-dragger:hover) {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--el-color-primary);
-}
-
-.preview-box {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.preview-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 14px;
-}
-
-.re-upload-glass-tip {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #ffffff;
-  text-align: center;
+.search-eyebrow {
+  margin: 0;
+  color: var(--text-accent);
   font-size: 12px;
-  padding: 8px 0;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-.upload-icon {
-  font-size: 48px;
-  color: #8e8e93;
-  margin-bottom: 16px;
-}
-
-.upload-text {
-  color: #ebebf5;
-  font-size: 14px;
-}
-
-.upload-text span {
-  color: var(--el-color-primary);
-  font-weight: 500;
-}
-
-.action-col {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.macos-form :deep(.el-form-item__label) {
-  color: #ebebf5;
-  font-weight: 500;
-}
-
-.macos-date-picker {
-  width: 100% !important;
-}
-
-.execute-btn {
-  width: 100%;
-  height: 50px;
+.search-description {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: var(--text-secondary);
   font-size: 16px;
-  margin-top: 16px;
-  border-radius: 16px !important;
+  line-height: 1.6;
 }
 
-.section-divider {
+.search-side {
   display: flex;
-  align-items: center;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
 }
 
-.section-divider::before,
-.section-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+.header-meta,
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
-.divider-text {
-  padding: 0 16px;
-  color: #8e8e93;
-  font-size: 14px;
-  font-weight: 500;
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.9fr);
+  gap: 20px;
+  align-items: stretch;
 }
 
-.apple-result-card {
-  background: rgba(30, 30, 30, 0.4) !important;
-  border-radius: 16px !important;
-  margin-bottom: 24px;
-  overflow: hidden;
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+.parameter-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.apple-result-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3) !important;
+.parameter-form :deep(.el-form-item) + :deep(.el-form-item) {
+  margin-top: 8px;
 }
 
-.image-wrapper {
-  position: relative;
-  height: 160px;
-  width: 100%;
-  background: #000;
+.helper-note {
+  margin: 18px 0 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
 }
 
-.result-img {
-  width: 100%;
-  height: 100%;
+.helper-note strong {
   display: block;
+  color: var(--text-primary);
+  font-size: 15px;
 }
 
-.glass-score-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 4px 10px;
-  border-radius: 10px;
-  color: white;
-  font-weight: 600;
-  font-size: 12px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.score-high { background: rgba(50, 215, 75, 0.8); border: 1px solid rgba(50, 215, 75, 0.3); }
-.score-mid { background: rgba(255, 214, 10, 0.8); border: 1px solid rgba(255, 214, 10, 0.3); color: #000; }
-.score-low { background: rgba(255, 69, 58, 0.8); border: 1px solid rgba(255, 69, 58, 0.3); }
-
-.glass-info-box {
-  padding: 12px 16px;
-  background: rgba(20, 20, 20, 0.6);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.main-info {
-  font-weight: 600;
-  color: #f5f5f7;
+.helper-note p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
   font-size: 14px;
-  margin-bottom: 6px;
+  line-height: 1.55;
 }
 
-.sub-info {
-  font-size: 12px;
-  color: #8e8e93;
-  line-height: 1.5;
+@media (max-width: 1080px) {
+  .workspace-grid,
+  .parameter-stats {
+    grid-template-columns: 1fr;
+  }
 }
 
-.macos-empty :deep(.el-empty__description) {
-  color: #8e8e93;
+@media (max-width: 860px) {
+  .search-header {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .search-side,
+  .header-meta,
+  .header-actions {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
 }
 </style>

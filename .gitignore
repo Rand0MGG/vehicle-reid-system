@@ -7,6 +7,9 @@ __pycache__/
 
 .idea/
 .vscode/
+.env
+.env.local
+.env.*.local
 
 build/
 venv/
@@ -20,8 +23,8 @@ frontend/dist/
 frontend/node_modules/
 frontend/.vite/
 
-backend/app/core/config.py
 backend/app/core/model_preferences.json
+backend/app/core/system_config.json
 
 *.log
 npm-debug.log*

@@ -1,4 +1,4 @@
-export function formatDateTime(value) {
+﻿export function formatDateTime(value) {
   if (!value) {
     return '未知'
   }
@@ -34,13 +34,16 @@ export function formatDuration(value) {
 
 export function normalizeModelMeta(payload = {}) {
   const currentModel = payload.current_model_file || ''
-  const defaultModel = payload.default_model_file || currentModel
+  const galleryModel = payload.gallery_model_file || ''
 
   return {
     current: currentModel,
-    default: defaultModel,
+    gallery: galleryModel,
     device: payload.model_device || '未知',
     initialized: Boolean(payload.initialized),
+    galleryMatchesCurrent: typeof payload.gallery_model_matches_current === 'boolean'
+      ? payload.gallery_model_matches_current
+      : !galleryModel || galleryModel === currentModel,
     availableModels: Array.isArray(payload.available_models) ? payload.available_models : []
   }
 }

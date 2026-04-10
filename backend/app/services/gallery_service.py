@@ -1,97 +1,133 @@
-import glob
-import os
-from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.models.vehicle import VehicleFeature
-from app.engine.predictor import reid_engine
-from app.core.config import settings
+﻿from datetime import datetime
+from pathlib import Path
 
-gallery_dir = os.path.join(settings.BASE_DIR, "../datasets/gallery")
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.system_config import load_system_config, save_system_config
+from app.db.session import SessionLocal
+from app.engine.predictor import reid_engine
+from app.models.vehicle import VehicleFeature
+
+
+gallery_dir = Path(settings.BASE_DIR).joinpath("../datasets/gallery").resolve()
 
 sync_status = {
     "is_running": False,
-    "logs": []
+    "logs": [],
 }
 
-def append_log(msg: str):
+
+def append_log(message: str):
     timestamp = datetime.now().strftime("%H:%M:%S")
-    sync_status["logs"].append(f"[{timestamp}] {msg}")
+    sync_status["logs"].append(f"[{timestamp}] {message}")
+
+
 
 def parse_filename(filename):
     try:
-        name = os.path.splitext(filename)[0]
-        parts = name.split('_')
-        if len(parts) >= 2:
-            vehicle_id = parts[0]
-            cam_id = parts[1]
-            if len(parts) >= 3 and len(parts[2]) == 14:
-                try:
-                    capture_dt = datetime.strptime(parts[2], "%Y%m%d%H%M%S")
-                except:
-                    capture_dt = datetime.now()
-            else:
-                capture_dt = datetime.now()
-            return {"vehicle_id": vehicle_id, "cam_id": cam_id, "capture_time": capture_dt}
-        else:
+        parts = Path(filename).stem.split("_")
+        if len(parts) < 2:
             return {"vehicle_id": "unknown", "cam_id": "unknown", "capture_time": datetime.now()}
-    except Exception as e:
+
+        vehicle_id = parts[0]
+        cam_id = parts[1]
+        capture_time = datetime.now()
+
+        if len(parts) >= 3 and len(parts[2]) == 14:
+            try:
+                capture_time = datetime.strptime(parts[2], "%Y%m%d%H%M%S")
+            except ValueError:
+                capture_time = datetime.now()
+
+        return {"vehicle_id": vehicle_id, "cam_id": cam_id, "capture_time": capture_time}
+    except Exception:
         return {"vehicle_id": "error", "cam_id": "error", "capture_time": datetime.now()}
+
+
+
+def _persist_gallery_model_state(db: Session, current_model_file: str):
+    total_records = db.query(VehicleFeature).count()
+    save_system_config({"gallery_model_file": current_model_file if total_records > 0 else ""})
+
+
 
 def clear_gallery_db(db: Session):
     try:
         db.execute(text("TRUNCATE TABLE vehicle_feature"))
         db.commit()
-    except Exception as e:
+        save_system_config({"gallery_model_file": ""})
+    except Exception:
         db.rollback()
-        raise e
+        raise
 
-def run_sync_task(db: Session):
+
+
+def _collect_image_paths():
+    image_paths = []
+    for pattern in ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG"):
+        image_paths.extend(gallery_dir.glob(pattern))
+    return sorted({path.resolve() for path in image_paths})
+
+
+
+def run_sync_task(clear_existing: bool = False):
     if sync_status["is_running"]:
         return
-    
+
+    db = SessionLocal()
     sync_status["is_running"] = True
     sync_status["logs"].clear()
-    append_log(f"开始扫描底库目录: {gallery_dir}")
-    
+    append_log(f"开始扫描图库目录: {gallery_dir}")
+
     try:
-        image_paths = glob.glob(os.path.join(gallery_dir, "*.[jJ][pP][gG]")) + \
-                      glob.glob(os.path.join(gallery_dir, "*.[pP][nN][gG]")) + \
-                      glob.glob(os.path.join(gallery_dir, "*.[jJ][pP][eE][gG]"))
-        
-        append_log(f"发现 {len(image_paths)} 张图像，准备执行高维特征提取")
-        
+        current_model_file = reid_engine.get_current_weight_file()
+        gallery_model_file = load_system_config().get("gallery_model_file", "")
+
+        if not clear_existing and gallery_model_file and gallery_model_file != current_model_file:
+            append_log("当前模型与图库特征使用的模型不一致，请先重新处理全部图片。")
+            return
+
+        if clear_existing:
+            clear_gallery_db(db)
+            append_log("已清空现有特征记录，开始重新处理全部图片。")
+
+        image_paths = _collect_image_paths()
+        append_log(f"发现 {len(image_paths)} 张图片，准备提取特征。")
+
         count = 0
-        for img_path in image_paths:
-            filename = os.path.basename(img_path)
-            exists = db.query(VehicleFeature).filter(
+        for image_path in image_paths:
+            filename = image_path.name
+            existing_record = db.query(VehicleFeature).filter(
                 VehicleFeature.img_path == f"gallery/{filename}"
             ).first()
-            
-            if exists:
+
+            if existing_record:
                 continue
 
-            meta = parse_filename(filename)
-            vector_numpy = reid_engine.extract_feature(img_path)
+            metadata = parse_filename(filename)
+            vector_numpy = reid_engine.extract_feature(str(image_path))
             vector_blob = vector_numpy.tobytes()
 
-            new_vehicle = VehicleFeature(
-                vehicle_id=meta["vehicle_id"],
-                cam_id=meta["cam_id"],
-                capture_time=meta["capture_time"],
-                img_path=f"gallery/{filename}",
-                feature=vector_blob
+            db.add(
+                VehicleFeature(
+                    vehicle_id=metadata["vehicle_id"],
+                    cam_id=metadata["cam_id"],
+                    capture_time=metadata["capture_time"],
+                    img_path=f"gallery/{filename}",
+                    feature=vector_blob,
+                )
             )
-            
-            db.add(new_vehicle)
             count += 1
-            append_log(f"底层落盘成功 [{count}]: {filename}")
+            append_log(f"已完成特征提取 [{count}]: {filename}")
 
         db.commit()
-        append_log(f"同步指令执行完毕，共持久化 {count} 条车辆记录")
-    except Exception as e:
+        _persist_gallery_model_state(db, current_model_file)
+        append_log(f"图库处理完成，本次新增 {count} 条特征记录。")
+    except Exception as exc:
         db.rollback()
-        append_log(f"提取管线异常中断: {str(e)}")
+        append_log(f"图库处理被异常中断: {exc}")
     finally:
         sync_status["is_running"] = False
         db.close()

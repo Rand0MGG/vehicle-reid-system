@@ -1,36 +1,41 @@
-import json
-from pathlib import Path
+﻿from typing import Dict, Optional
 
-from app.core.config import settings
-
-
-PREFERENCES_PATH = Path(settings.BASE_DIR).joinpath("app/core/model_preferences.json")
+from app.core.system_config import load_system_config, save_system_config
 
 
-def load_model_preferences() -> dict:
-    if not PREFERENCES_PATH.exists():
-        return {}
-
-    try:
-        with PREFERENCES_PATH.open("r", encoding="utf-8") as file:
-            data = json.load(file)
-            return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+def load_model_preferences() -> Dict[str, str]:
+    current_model_file = load_system_config().get("current_model_file", "")
+    return {
+        "current_model_file": current_model_file,
+        "default_model_file": current_model_file,
+    }
 
 
-def save_model_preferences(preferences: dict) -> None:
-    PREFERENCES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with PREFERENCES_PATH.open("w", encoding="utf-8") as file:
-        json.dump(preferences, file, ensure_ascii=False, indent=2)
+def save_model_preferences(preferences: Dict[str, str]) -> None:
+    current_model_file = ""
+
+    if isinstance(preferences, dict):
+        value = preferences.get("current_model_file")
+        if not isinstance(value, str) or not value.strip():
+            value = preferences.get("default_model_file")
+        if isinstance(value, str):
+            current_model_file = value.strip()
+
+    save_system_config({"current_model_file": current_model_file})
 
 
-def get_default_model_file() -> str | None:
-    value = load_model_preferences().get("default_model_file")
+def get_current_model_file() -> Optional[str]:
+    value = load_system_config().get("current_model_file", "")
     return value if isinstance(value, str) and value else None
 
 
+def set_current_model_file(model_file: str) -> None:
+    save_system_config({"current_model_file": model_file})
+
+
+def get_default_model_file() -> Optional[str]:
+    return get_current_model_file()
+
+
 def set_default_model_file(model_file: str) -> None:
-    preferences = load_model_preferences()
-    preferences["default_model_file"] = model_file
-    save_model_preferences(preferences)
+    set_current_model_file(model_file)

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <SectionCard
     eyebrow="Query"
     title="上传查询图像"
@@ -32,7 +32,11 @@
       <div class="toolbar-copy">
         <strong>{{ fileName ? '查询图像已准备好' : '还没有选择图片' }}</strong>
         <span>
-          {{ fileName ? '现在可以直接开始检索，也可以重新选择一张更清晰的图片。' : '建议上传主体清晰、角度稳定的车辆图像。' }}
+          {{
+            fileName
+              ? '现在可以直接开始检索，也可以重新选择一张更清晰的图片。'
+              : '建议上传主体清晰、角度稳定的车辆图像。'
+          }}
         </span>
       </div>
 

@@ -59,6 +59,9 @@ const showHeader = computed(() => {
 
 <style scoped>
 .section-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   padding: 28px;
   border: 1px solid var(--border-soft);
   border-radius: 28px;
@@ -133,6 +136,7 @@ const showHeader = computed(() => {
 
 .section-body {
   margin-top: 22px;
+  flex: 1;
 }
 
 @media (max-width: 860px) {

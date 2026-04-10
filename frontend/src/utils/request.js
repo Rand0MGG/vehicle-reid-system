@@ -1,8 +1,9 @@
 ﻿import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import router from '@/router'
 
 const service = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL?.trim() || '/api/v1',
   timeout: 10000
 })
 
@@ -39,16 +40,24 @@ service.interceptors.response.use(
   },
   (error) => {
     console.error('Response Error:', error)
+    const responseMessage =
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      error.message ||
+      '请求失败，请稍后重试。'
 
     if (error.response && error.response.status === 401) {
       ElMessage.error('身份凭证已过期或无效，请重新登录。')
       localStorage.removeItem('access_token')
       localStorage.removeItem('user_role')
-      window.location.href = '/login'
+      if (router.currentRoute.value.name !== 'login') {
+        router.push({ name: 'login' }).catch(() => {})
+      }
     } else {
-      ElMessage.error(error.message || '请求失败，请稍后重试。')
+      ElMessage.error(responseMessage)
     }
 
+    error.message = responseMessage
     return Promise.reject(error)
   }
 )

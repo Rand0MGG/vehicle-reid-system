@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+﻿import { ref } from 'vue'
 import { searchVehicle } from '@/api/search'
 import { normalizeSearchResults } from '@/utils/formatters'
 
@@ -81,7 +81,7 @@ export function useSearchWorkflow() {
           `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果。`
         )
       } else {
-        setFeedback('warning', '没有找到匹配结果', '可以尝试更换查询图像，或适当提高返回结果数量。')
+        setFeedback('warning', '没有找到匹配结果', '可以尝试更换更清晰的查询图像，或者适当提高返回结果数量。')
       }
 
       return response.data

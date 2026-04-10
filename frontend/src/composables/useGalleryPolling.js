@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref } from 'vue'
+﻿import { onBeforeUnmount, ref } from 'vue'
 import { fetchGalleryStatus } from '@/api/admin'
 
 export function useGalleryPolling() {

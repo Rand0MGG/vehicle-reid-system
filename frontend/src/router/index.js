@@ -5,17 +5,17 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: () => import('@/views/LoginPage.vue')
+    component: () => import('@/views/login.vue')
   },
   {
     path: '/search',
     name: 'search',
-    component: () => import('@/views/SearchPageV2.vue')
+    component: () => import('@/views/Search.vue')
   },
   {
     path: '/admin',
     name: 'admin',
-    component: () => import('@/views/AdminPageV2.vue'),
+    component: () => import('@/views/admin.vue'),
     meta: { requiresAdmin: true }
   },
   {

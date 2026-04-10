@@ -1,8 +1,8 @@
-<template>
+﻿<template>
   <SectionCard
     eyebrow="Results"
     title="检索结果"
-    :description="searched ? '结果按相似度从高到低展示，支持逐张查看原图。' : '上传查询图像并完成检索后，这里会显示相似车辆结果。'"
+    :description="searched ? '结果按相似度从高到低显示，支持逐张查看原图。' : '上传查询图像并完成检索后，这里会显示相似车辆结果。'"
   >
     <template #meta>
       <span v-if="searched" class="results-meta">共 {{ results.length }} 条 · 耗时 {{ formatDuration(timeCost) }}</span>

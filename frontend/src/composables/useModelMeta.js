@@ -1,17 +1,13 @@
-import { ref } from 'vue'
+﻿import { ref } from 'vue'
 import { fetchModelFiles, selectModelFile } from '@/api/admin'
 import { normalizeModelMeta } from '@/utils/formatters'
 
-function getSelectionTarget(selectionTarget, modelState, currentSelection) {
-  if (selectionTarget === 'default') {
-    return modelState.default || modelState.current || ''
-  }
-
-  if (selectionTarget === 'preserve' && currentSelection) {
+function pickSelectionTarget(selectionTarget, nextState, currentSelection) {
+  if (selectionTarget === 'preserve' && currentSelection && nextState.availableModels.includes(currentSelection)) {
     return currentSelection
   }
 
-  return modelState.current || modelState.default || ''
+  return nextState.current || ''
 }
 
 export function useModelMeta() {
@@ -22,9 +18,10 @@ export function useModelMeta() {
   const selectedModelFile = ref('')
   const modelState = ref({
     current: '',
-    default: '',
+    gallery: '',
     device: '未知',
-    initialized: false
+    initialized: false,
+    galleryMatchesCurrent: true
   })
 
   const loadModelMeta = async ({ selectionTarget = 'current' } = {}) => {
@@ -37,14 +34,15 @@ export function useModelMeta() {
 
       modelState.value = {
         current: normalized.current,
-        default: normalized.default,
+        gallery: normalized.gallery,
         device: normalized.device,
-        initialized: normalized.initialized
+        initialized: normalized.initialized,
+        galleryMatchesCurrent: normalized.galleryMatchesCurrent
       }
       modelFiles.value = normalized.availableModels
-      selectedModelFile.value = getSelectionTarget(
+      selectedModelFile.value = pickSelectionTarget(
         selectionTarget,
-        modelState.value,
+        normalized,
         selectedModelFile.value
       )
 
@@ -57,7 +55,7 @@ export function useModelMeta() {
     }
   }
 
-  const applySelectedModel = async ({ setAsDefault = false } = {}) => {
+  const applySelectedModel = async () => {
     if (!selectedModelFile.value) {
       return null
     }
@@ -67,16 +65,13 @@ export function useModelMeta() {
 
     try {
       const response = await selectModelFile({
-        model_file: selectedModelFile.value,
-        set_as_default: setAsDefault
+        model_file: selectedModelFile.value
       })
 
-      await loadModelMeta({ selectionTarget: setAsDefault ? 'default' : 'current' })
+      await loadModelMeta({ selectionTarget: 'current' })
       return response.data
     } catch (error) {
-      errorMessage.value = setAsDefault
-        ? '默认模型保存失败，请稍后重试。'
-        : '当前模型切换失败，请稍后重试。'
+      errorMessage.value = '当前模型切换失败，请稍后重试。'
       throw error
     } finally {
       applying.value = false

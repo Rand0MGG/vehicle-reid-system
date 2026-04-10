@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="terminal-shell">
     <div class="terminal-top">
       <div class="lights">
@@ -120,10 +120,7 @@ defineExpose({
   margin-top: 4px;
 }
 
-.terminal-placeholder {
-  color: var(--text-on-dark-muted);
-}
-
+.terminal-placeholder,
 .terminal-cursor {
   color: var(--text-on-dark-muted);
 }

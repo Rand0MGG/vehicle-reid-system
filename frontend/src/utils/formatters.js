@@ -32,21 +32,34 @@ export function formatDuration(value) {
   return `${Math.round(seconds * 10) / 10} 秒`
 }
 
-export function normalizeModelMeta(payload = {}) {
+export function normalizeModelState(payload = {}) {
   const currentModel = payload.current_model_file || ''
   const galleryModel = payload.gallery_model_file || ''
+  const maxResults = Number(payload.max_results ?? 50)
+  const searchDefaultTopK = Number(payload.search_default_top_k ?? 10)
+  const allowedQuerySuffixes = Array.isArray(payload.allowed_query_suffixes)
+    ? payload.allowed_query_suffixes
+    : []
 
   return {
     current: currentModel,
     gallery: galleryModel,
     device: payload.model_device || '未知',
     initialized: Boolean(payload.initialized),
+    galleryHasRecords: Boolean(payload.gallery_has_records),
+    galleryModelKnown: Boolean(payload.gallery_model_known ?? galleryModel),
     galleryMatchesCurrent: typeof payload.gallery_model_matches_current === 'boolean'
       ? payload.gallery_model_matches_current
       : !galleryModel || galleryModel === currentModel,
-    availableModels: Array.isArray(payload.available_models) ? payload.available_models : []
+    availableModels: Array.isArray(payload.available_models) ? payload.available_models : [],
+    availableModelCount: Number(payload.available_model_count ?? 0),
+    maxResults: Number.isFinite(maxResults) ? maxResults : 50,
+    searchDefaultTopK: Number.isFinite(searchDefaultTopK) ? searchDefaultTopK : 10,
+    allowedQuerySuffixes
   }
 }
+
+export const normalizeModelMeta = normalizeModelState
 
 export function normalizeSearchResults(items = []) {
   if (!Array.isArray(items)) {

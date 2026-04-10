@@ -1,8 +1,13 @@
-from fastapi import BackgroundTasks
+import logging
 from typing import Optional
+
+from fastapi import BackgroundTasks
 
 from app.db.session import SessionLocal
 from app.models.sys_log_model import SysLog
+
+
+logger = logging.getLogger(__name__)
 
 
 def execute_audit_insertion(user_id: Optional[int], operation: str, status: bool) -> None:
@@ -17,7 +22,7 @@ def execute_audit_insertion(user_id: Optional[int], operation: str, status: bool
         db.commit()
     except Exception:
         db.rollback()
-        raise
+        logger.exception("Failed to insert audit log: user_id=%s, operation=%s", user_id, operation)
     finally:
         db.close()
 

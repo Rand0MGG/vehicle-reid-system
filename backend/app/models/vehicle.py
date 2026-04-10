@@ -1,7 +1,8 @@
-# backend/app/models/vehicle.py
-from sqlalchemy import Column, Integer, String, DateTime, LargeBinary
 from datetime import datetime
-from app.models.user import Base  # 复用 user.py 里的 Base
+
+from sqlalchemy import Column, DateTime, Integer, LargeBinary, String
+
+from app.models.base import Base
 
 class VehicleFeature(Base):
     """

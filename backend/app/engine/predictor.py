@@ -1,4 +1,5 @@
-﻿import sys
+﻿import logging
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,9 @@ from app.core.config import settings
 from app.core.system_config import load_system_config, save_system_config
 
 
+logger = logging.getLogger(__name__)
+
+
 FASTREID_ROOT = Path(__file__).resolve().parents[3] / "fastreid"
 sys.path.append(str(FASTREID_ROOT))
 
@@ -20,9 +24,9 @@ try:
     from fastreid.modeling import build_model
     from fastreid.utils.checkpoint import Checkpointer
 
-    print("FastReID 库加载成功")
+    logger.info("FastReID library loaded successfully")
 except ImportError as exc:
-    print(f"FastReID 加载失败: {exc}")
+    logger.exception("FastReID import failed")
     sys.exit(1)
 
 
@@ -103,7 +107,7 @@ class ReIDEngine:
         if self.initialized:
             return
 
-        print("正在加载 ReID 模型...")
+        logger.info("Loading ReID model")
 
         cfg = get_cfg()
         cfg.merge_from_file(settings.MODEL_CONFIG_FILE)
@@ -116,15 +120,15 @@ class ReIDEngine:
 
         if self.weights_file.exists():
             Checkpointer(self.model).load(str(self.weights_file))
-            print(f"已加载模型权重: {self.weights_file}")
+            logger.info("Loaded model weights: %s", self.weights_file)
         else:
-            print(f"未找到模型权重文件，将使用随机参数启动: {self.weights_file}")
+            logger.warning("Model weights were not found, using random parameters: %s", self.weights_file)
 
         self.transforms = build_transforms(cfg, is_train=False)
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.model.to(self.device)
         self.initialized = True
-        print("ReID 引擎初始化完成")
+        logger.info("ReID engine initialized")
 
     def extract_feature(self, image_path: str):
         if not self.initialized:

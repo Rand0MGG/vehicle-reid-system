@@ -69,8 +69,8 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import StatusBanner from '@/components/base/StatusBanner.vue'
-import { useSession } from '@/composables/useSession'
+import StatusBanner from '@/components/base/status-banner.vue'
+import { useSession } from '@/composables/use-session'
 import { login } from '@/api/auth'
 
 const router = useRouter()

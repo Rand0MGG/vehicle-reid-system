@@ -1,13 +1,23 @@
 import collections
-import os
+import logging
+from pathlib import Path
+
+from app.core.logging_config import configure_logging
+from app.core.system_config import load_system_config
+
+configure_logging(load_system_config().get("log_level", "INFO"))
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.endpoints import admin_api, auth, model_admin, search
+from app.api.endpoints import admin_api, auth, search
 from app.core.config import settings
+from app.db.bootstrap import run_startup_migrations
+
+
+logger = logging.getLogger(__name__)
 
 
 if not hasattr(collections, "Mapping"):
@@ -30,23 +40,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-datasets_dir = os.path.join(settings.BASE_DIR, "../datasets")
-if not os.path.exists(datasets_dir):
-    os.makedirs(datasets_dir)
+datasets_dir = Path(settings.DATASETS_DIR).resolve()
+datasets_dir.mkdir(parents=True, exist_ok=True)
+Path(settings.SEARCH_UPLOAD_DIR).resolve().mkdir(parents=True, exist_ok=True)
 
-app.mount("/static", StaticFiles(directory=datasets_dir), name="static")
+app.mount("/static", StaticFiles(directory=str(datasets_dir)), name="static")
 
 app.include_router(search.router, prefix=settings.API_V1_STR)
 app.include_router(auth.router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(admin_api.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
-app.include_router(model_admin.router, prefix=settings.API_V1_STR + "/admin", tags=["admin"])
 
 
 @app.on_event("startup")
 async def startup_event():
-    print("Initializing ReID Engine...")
-    print("API Docs available at: http://127.0.0.1:8000/docs")
-    print("Static files available at: http://127.0.0.1:8000/static")
+    run_startup_migrations()
+    logger.info("API docs available at: http://127.0.0.1:8000/docs")
+    logger.info("Static files available at: http://127.0.0.1:8000/static")
 
 
 @app.get("/")

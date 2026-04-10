@@ -9,10 +9,14 @@ class SearchService:
     def __init__(self, db: Session):
         self.db = db
 
-    def search(self, img_path: str, top_k: int = 10):
+    def search(self, img_path: str, top_k: int = 10, similarity_threshold: float = 0.0):
         query_feat = self._extract_query_feature(img_path)
         gallery_data = self._fetch_gallery_data()
-        results = self._calculate_similarity(query_feat, gallery_data)
+        results = self._calculate_similarity(
+            query_feat,
+            gallery_data,
+            similarity_threshold=similarity_threshold,
+        )
         return results[:top_k]
 
     def _extract_query_feature(self, img_path):
@@ -37,7 +41,7 @@ class SearchService:
 
         return {"matrix": np.array(features), "meta": metadata}
 
-    def _calculate_similarity(self, query_feat, gallery_data):
+    def _calculate_similarity(self, query_feat, gallery_data, similarity_threshold: float = 0.0):
         gallery_matrix = gallery_data["matrix"]
         metadata = gallery_data["meta"]
 
@@ -57,6 +61,9 @@ class SearchService:
         results = []
         for idx in sorted_indices:
             score = float(sim_scores[idx])
+            if score < similarity_threshold:
+                continue
+
             info = metadata[idx]
             results.append(
                 {

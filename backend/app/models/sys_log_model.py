@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from datetime import datetime
-from app.models.user import Base
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+
+from app.models.base import Base
 
 class SysLog(Base):
     __tablename__ = "sys_log"

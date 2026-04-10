@@ -18,7 +18,7 @@ It supports a practical workflow:
 2. Trigger gallery sync/rebuild → features are extracted and stored to MySQL.
 3. Upload a query image → backend extracts feature → computes cosine similarity against DB features → returns ranked results including image URLs.
 
-> **Status:** This project is under active development and not final (see the note at the end).
+> **Status:** Current tracked version is `v1.0.0` (2026-04-10). The core search, admin, gallery, and audit flows described below are implemented in the current codebase.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart LR
 | `backend/app/services/` | Core workflows | `search_service.py` and `gallery_service.py`. |
 | `backend/app/db/` | DB init + SQLAlchemy session | `init.sql` creates tables; `session.py` connects using `SQLALCHEMY_DATABASE_URI`. |
 | `backend/app/models/` | SQLAlchemy ORM models | `sys_user`, `vehicle_feature`, `sys_log`. |
-| `backend/app/core/` | Backend config & security helpers | `config.example.py` must be copied to `config.py`. |
+| `backend/app/core/` | Backend config & security helpers | Uses committed `config.py` plus runtime config stored by `system_config.py`. |
 | `backend/app/engine/` | ReID inference bridge | Contains `predictor.py` (UNSPECIFIED: tool could not fetch file contents at generation time). |
 | `configs/` | ReID model/training config | Provides `vehicle_reid.yml`. |
 | `fastreid/` | FastReID source code | Vendored library used for training/eval and possibly inference. |
@@ -130,10 +130,7 @@ erDiagram
 
 ### Backend static configuration (`backend/app/core/config.py`)
 
-A `config.py` file is required but **not committed**. Create it by copying `config.example.py`:
-
-- Source template: `backend/app/core/config.example.py`
-- Target: `backend/app/core/config.py`
+The current repo already tracks `backend/app/core/config.py`. For deployment, update it together with the repo-root `.env` as needed instead of copying `config.example.py`.
 
 Key options:
 
@@ -146,16 +143,19 @@ Key options:
 | `DEVICE` | `cpu` | `cpu` or `cuda`. |
 | `SQLALCHEMY_DATABASE_URI` | `mysql+pymysql://root:******@localhost:3306/vehicle_reid_db` | DB connection string. |
 
-### Runtime (in-memory) admin configuration (`admin_api.py`)
+### Runtime admin configuration (`system_config.py` / admin API)
 
-`backend/app/api/endpoints/admin_api.py` defines a `dynamic_config` dictionary which can be read/updated via admin endpoints:
+Runtime configuration is persisted through `backend/app/core/system_config.py` and updated via admin endpoints. It is no longer an in-memory-only `dynamic_config` dictionary.
 
 | Key | Default | Notes |
 |---|---:|---|
-| `model_device` | `cpu` | In-memory only. (UNSPECIFIED: whether it is actually applied to inference in current code.) |
-| `similarity_threshold` | `0.5` | In-memory only. (UNSPECIFIED: whether applied in `SearchService`.) |
-| `max_results` | `50` | In-memory only. (UNSPECIFIED: whether applied in `SearchService`.) |
-| `log_level` | `INFO` | In-memory only. |
+| `model_device` | `cpu` | Applied to the inference engine through the admin config flow. |
+| `similarity_threshold` | `0.5` | Applied during retrieval in `SearchService`. |
+| `max_results` | `50` | Used to cap frontend and backend search result counts. |
+| `search_default_top_k` | `10` | Default search result count shown in the frontend. |
+| `gallery_poll_interval_ms` | `1500` | Controls gallery task polling in the admin UI. |
+| `allowed_query_suffixes` | `.jpg,.jpeg,.png,.bmp,.webp` | Allowed query image suffixes for upload/search. |
+| `log_level` | `INFO` | Applied on startup and when saved through admin config. |
 
 ---
 
@@ -288,7 +288,7 @@ mysql -u root -p < backend/app/db/init.sql
 
 - `SQLALCHEMY_DATABASE_URI`
 
-3. Create an admin account with a **bcrypt-hashed password**:
+3. Optionally create an admin account with a **bcrypt-hashed password**:
 
 ```bash
 cd backend
@@ -297,7 +297,8 @@ python create_admin.py
 
 Notes:
 - `create_admin.py` creates `admin` with password `123456` (hashed).
-- `backend/app/db/init.sql` inserts a default admin row (`admin / admin123`) **in plaintext**. That plaintext value will **not** pass bcrypt verification in `auth.py`. Prefer `create_admin.py` (or replace the SQL insert with a bcrypt hash).
+- `backend/app/db/init.sql` inserts a default builtin admin row (`admin / admin123`).
+- On backend startup, `backend/app/db/bootstrap.py` normalizes builtin plaintext passwords into bcrypt hashes automatically, so a fresh initialized database can still log in after the first backend start.
 
 ### Frontend (Vue3 + Vite)
 
@@ -383,7 +384,7 @@ You can also call:
 - `POST /gallery/sync` (incremental)
 - `POST /gallery/clear` (truncate table)
 - `GET /gallery/status` (progress logs)
-- `GET /gallery/stats` (counts)
+- `GET /gallery/stats` or `GET /overview` (counts / runtime overview)
 
 **UNSPECIFIED:** The exact router prefix (e.g., `/api/v1/admin/...`) depends on how routers are included in `backend/main.py`.
 
@@ -396,7 +397,7 @@ python reset_gallery.py
 
 (UNSPECIFIED: the exact behavior of `reset_gallery.py` is determined by its implementation; verify if it calls the same ingestion pipeline.)
 
-### Query search (Top-K)
+### Query search
 
 The search API accepts:
 
@@ -475,7 +476,7 @@ Example response (shape matches `search.py`):
         "cam_id": "c001",
         "capture_time": "2026-01-24T10:00:00",
         "img_path": "gallery/0001_c001_20260124100000.jpg",
-        "img_url": "http://localhost:8000/static/gallery/0001_c001_20260124100000.jpg",
+        "img_url": "/static/gallery/0001_c001_20260124100000.jpg",
         "score": 0.9987
       }
     ]
@@ -484,7 +485,8 @@ Example response (shape matches `search.py`):
 ```
 
 Notes:
-- `img_url` is currently built using a **hardcoded** `http://localhost:8000` in `search_service.py`. If you deploy elsewhere, adjust the code accordingly.
+- `img_url` is returned as a relative `/static/...` path in the current code.
+- Search is blocked when gallery features exist but the gallery model is unknown, or when the current model and gallery feature model do not match.
 
 ### Admin: rebuild gallery
 
@@ -579,7 +581,7 @@ The gallery sync uses a global `sync_status`. If the process was interrupted, yo
 
 ## Project Status
 
-This repository is **under active development**. Interfaces, configuration keys, and module boundaries may change, and some items in this README are explicitly marked as **UNSPECIFIED** where the repo does not pin or fully define behavior. Please verify and refine as you iterate.
+This repository is now tracked as **v1.0.0**. Interfaces may continue to evolve, but the admin console, search flow, runtime config, gallery processing, and audit coverage described in this README reflect the current implementation.
 
 ---
 
@@ -654,7 +656,7 @@ flowchart LR
 | `backend/app/services/` | 核心工作流 | `search_service.py` 与 `gallery_service.py`。 |
 | `backend/app/db/` | 数据库初始化与连接 | `init.sql` 建表；`session.py` 使用 `SQLALCHEMY_DATABASE_URI` 连接。 |
 | `backend/app/models/` | SQLAlchemy ORM 模型 | `sys_user`、`vehicle_feature`、`sys_log`。 |
-| `backend/app/core/` | 后端配置与安全组件 | `config.example.py` 需要复制为 `config.py`。 |
+| `backend/app/core/` | 后端配置与安全组件 | 当前使用已提交的 `config.py`，运行时配置由 `system_config.py` 持久化。 |
 | `backend/app/engine/` | ReID 推理桥接层 | 包含 `predictor.py`（UNSPECIFIED：生成时工具无法抓取该文件正文）。 |
 | `configs/` | ReID 配置/训练配置 | 提供 `vehicle_reid.yml`。 |
 | `fastreid/` | FastReID 源码 | 用于训练/评估，可能也用于推理。 |

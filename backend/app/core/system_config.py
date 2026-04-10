@@ -1,17 +1,21 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 from app.core.config import settings
 
 
 SYSTEM_CONFIG_PATH = Path(settings.BASE_DIR).joinpath("app/core/system_config.json")
 LEGACY_MODEL_PREFERENCES_PATH = Path(settings.BASE_DIR).joinpath("app/core/model_preferences.json")
+DEFAULT_ALLOWED_QUERY_SUFFIXES = [".jpg", ".jpeg", ".png", ".bmp", ".webp"]
 
 DEFAULT_SYSTEM_CONFIG = {
     "model_device": settings.DEVICE,
     "similarity_threshold": 0.5,
     "max_results": 50,
+    "search_default_top_k": 10,
+    "gallery_poll_interval_ms": 1500,
+    "allowed_query_suffixes": list(DEFAULT_ALLOWED_QUERY_SUFFIXES),
     "log_level": "INFO",
     "current_model_file": "",
     "gallery_model_file": "",
@@ -22,6 +26,36 @@ def _normalize_model_name(value: Any) -> str:
     if not isinstance(value, str):
         return ""
     return value.strip()
+
+
+def _normalize_suffix(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+
+    normalized = value.strip().lower()
+    if not normalized:
+        return ""
+
+    return normalized if normalized.startswith(".") else f".{normalized}"
+
+
+def _normalize_suffixes(values: Any) -> list[str]:
+    candidates: Iterable[Any]
+
+    if isinstance(values, str):
+        candidates = values.split(",")
+    elif isinstance(values, list):
+        candidates = values
+    else:
+        candidates = DEFAULT_ALLOWED_QUERY_SUFFIXES
+
+    suffixes = []
+    for value in candidates:
+        suffix = _normalize_suffix(value)
+        if suffix and suffix not in suffixes:
+            suffixes.append(suffix)
+
+    return suffixes or list(DEFAULT_ALLOWED_QUERY_SUFFIXES)
 
 
 def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -42,6 +76,18 @@ def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str,
     if isinstance(max_results, (int, float)):
         normalized["max_results"] = max(1, int(max_results))
 
+    search_default_top_k = data.get("search_default_top_k")
+    if isinstance(search_default_top_k, (int, float)):
+        normalized["search_default_top_k"] = max(1, int(search_default_top_k))
+
+    gallery_poll_interval_ms = data.get("gallery_poll_interval_ms")
+    if isinstance(gallery_poll_interval_ms, (int, float)):
+        normalized["gallery_poll_interval_ms"] = max(500, int(gallery_poll_interval_ms))
+
+    normalized["allowed_query_suffixes"] = _normalize_suffixes(
+        data.get("allowed_query_suffixes", DEFAULT_ALLOWED_QUERY_SUFFIXES)
+    )
+
     log_level = data.get("log_level")
     if isinstance(log_level, str) and log_level.strip():
         normalized["log_level"] = log_level.strip()
@@ -52,6 +98,10 @@ def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str,
     normalized["current_model_file"] = current_model_file
 
     normalized["gallery_model_file"] = _normalize_model_name(data.get("gallery_model_file"))
+    normalized["search_default_top_k"] = min(
+        normalized["search_default_top_k"],
+        normalized["max_results"],
+    )
 
     return normalized
 

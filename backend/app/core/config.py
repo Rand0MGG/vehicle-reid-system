@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     BASE_DIR: str = str(BACKEND_DIR)
+    DATASETS_DIR: str = str(REPO_ROOT / "datasets")
+    GALLERY_DIR: str = str(REPO_ROOT / "datasets" / "gallery")
     MODEL_CONFIG_FILE: str = str(REPO_ROOT / "configs" / "vehicle_reid.yml")
     MODEL_WEIGHTS_FILE: str = str(REPO_ROOT / "outputs" / "model_final.pth")
     SEARCH_UPLOAD_DIR: str = str(REPO_ROOT / "tmp" / "search_uploads")

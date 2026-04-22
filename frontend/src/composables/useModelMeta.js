@@ -1,13 +1,20 @@
-﻿import { ref } from 'vue'
-import { fetchModelFiles, selectModelFile } from '@/api/admin'
+import { ref } from 'vue'
+import { fetchModelState } from '@/api/admin'
 import { normalizeModelMeta } from '@/utils/formatters'
 
 function pickSelectionTarget(selectionTarget, nextState, currentSelection) {
-  if (selectionTarget === 'preserve' && currentSelection && nextState.availableModels.includes(currentSelection)) {
-    return currentSelection
+  const candidates = nextState.publicModelProfiles.length
+    ? nextState.publicModelProfiles
+    : nextState.availableModelProfiles
+
+  if (selectionTarget === 'preserve' && currentSelection) {
+    const preserved = candidates.find((item) => Number(item.id) === Number(currentSelection))
+    if (preserved) {
+      return preserved.id
+    }
   }
 
-  return nextState.current || ''
+  return candidates[0]?.id || 0
 }
 
 export function useModelMeta() {
@@ -15,7 +22,7 @@ export function useModelMeta() {
   const applying = ref(false)
   const errorMessage = ref('')
   const modelFiles = ref([])
-  const selectedModelFile = ref('')
+  const selectedModelFile = ref(0)
   const modelState = ref({
     current: '',
     gallery: '',
@@ -29,22 +36,22 @@ export function useModelMeta() {
     errorMessage.value = ''
 
     try {
-      const response = await fetchModelFiles()
+      const response = await fetchModelState()
       const normalized = normalizeModelMeta(response.data)
+      const profiles = normalized.publicModelProfiles.length
+        ? normalized.publicModelProfiles
+        : normalized.availableModelProfiles
+      const selectedProfile = profiles.find((item) => Number(item.id) === Number(selectedModelFile.value)) || profiles[0]
 
       modelState.value = {
-        current: normalized.current,
-        gallery: normalized.gallery,
+        current: selectedProfile?.name || '',
+        gallery: selectedProfile?.feature_status?.is_complete ? selectedProfile?.name || '' : '',
         device: normalized.device,
         initialized: normalized.initialized,
-        galleryMatchesCurrent: normalized.galleryMatchesCurrent
+        galleryMatchesCurrent: true
       }
-      modelFiles.value = normalized.availableModels
-      selectedModelFile.value = pickSelectionTarget(
-        selectionTarget,
-        normalized,
-        selectedModelFile.value
-      )
+      modelFiles.value = profiles.map((item) => ({ label: item.name, value: item.id }))
+      selectedModelFile.value = pickSelectionTarget(selectionTarget, normalized, selectedModelFile.value)
 
       return response.data
     } catch (error) {
@@ -56,23 +63,9 @@ export function useModelMeta() {
   }
 
   const applySelectedModel = async () => {
-    if (!selectedModelFile.value) {
-      return null
-    }
-
     applying.value = true
-    errorMessage.value = ''
-
     try {
-      const response = await selectModelFile({
-        model_file: selectedModelFile.value
-      })
-
-      await loadModelMeta({ selectionTarget: 'current' })
-      return response.data
-    } catch (error) {
-      errorMessage.value = '当前模型切换失败，请稍后重试。'
-      throw error
+      return null
     } finally {
       applying.value = false
     }

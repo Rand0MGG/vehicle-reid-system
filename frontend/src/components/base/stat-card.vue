@@ -1,5 +1,5 @@
 <template>
-  <article class="stat-card" :class="[`tone-${tone}`, { mono }]">
+  <article class="stat-card" :class="[`tone-${tone}`, { mono, number, text }]">
     <p class="stat-label">{{ label }}</p>
     <strong class="stat-value" :title="value">{{ value }}</strong>
     <p v-if="hint" class="stat-hint">{{ hint }}</p>
@@ -27,6 +27,14 @@ defineProps({
   mono: {
     type: Boolean,
     default: false
+  },
+  number: {
+    type: Boolean,
+    default: false
+  },
+  text: {
+    type: Boolean,
+    default: false
   }
 })
 </script>
@@ -36,7 +44,7 @@ defineProps({
   min-width: 0;
   padding: 18px;
   border: 1px solid var(--border-soft);
-  border-radius: 20px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.54);
   box-shadow: var(--shadow-ring);
 }
@@ -71,16 +79,29 @@ defineProps({
   display: block;
   margin-top: 10px;
   color: var(--text-primary);
-  font-family: var(--font-serif);
+  font-family: var(--font-number);
   font-size: clamp(22px, 3vw, 30px);
   font-weight: 500;
   line-height: 1.24;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .mono .stat-value {
   font-family: var(--font-mono);
   font-size: 18px;
+}
+
+.text .stat-value {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.number .stat-value {
+  font-family: var(--font-number);
 }
 
 .stat-hint {

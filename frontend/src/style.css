@@ -28,6 +28,7 @@
   --font-serif: Georgia, "Songti SC", "STSong", "Times New Roman", serif;
   --font-sans: "PingFang SC", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --font-number: "Cascadia Code", "SFMono-Regular", Consolas, "Microsoft YaHei", monospace;
   --page-max-width: 1380px;
   --el-color-primary: #c96442;
   --el-color-primary-light-3: #d98b6d;
@@ -40,7 +41,7 @@
   --el-color-warning: #b9853b;
   --el-color-danger: #b53333;
   --el-color-info: #87867f;
-  --el-border-radius-base: 12px;
+  --el-border-radius-base: 8px;
   --el-border-radius-small: 8px;
   --el-border-radius-round: 999px;
   --el-border-color: #e8e6dc;
@@ -83,6 +84,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   scrollbar-width: thin;
   scrollbar-color: rgba(201, 100, 66, 0.86) rgba(255, 255, 255, 0.58);
+  font-variant-numeric: tabular-nums;
 }
 
 #app {
@@ -166,7 +168,7 @@ select {
   min-height: 42px;
   padding: 0 18px;
   font-weight: 500;
-  border-radius: 16px;
+  border-radius: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
@@ -234,7 +236,7 @@ select {
 .el-pagination button,
 .el-pager li,
 .el-table {
-  border-radius: 16px;
+  border-radius: 8px;
 }
 
 .el-card,

@@ -51,34 +51,85 @@ class VehicleID(ImageDataset):
         super(VehicleID, self).__init__(train, query, gallery, **kwargs)
 
     def process_dir(self, list_file, is_train=True):
-        img_list_lines = open(list_file, 'r').readlines()
+        return _process_vehicleid_list(list_file, self.image_dir, self.dataset_name, is_train)
 
-        dataset = []
-        for idx, line in enumerate(img_list_lines):
-            line = line.strip()
-            vid = int(line.split(' ')[1])
-            imgid = line.split(' ')[0]
-            img_path = osp.join(self.image_dir, f"{imgid}.jpg")
-            imgid = int(imgid)
-            if is_train:
-                vid = f"{self.dataset_name}_{vid}"
-                imgid = f"{self.dataset_name}_{imgid}"
-            dataset.append((img_path, vid, imgid))
 
-        if is_train: return dataset
+def _process_vehicleid_list(list_file, image_dir, dataset_name, is_train=True):
+    img_list_lines = open(list_file, 'r').readlines()
+
+    dataset = []
+    for idx, line in enumerate(img_list_lines):
+        line = line.strip()
+        vid = int(line.split(' ')[1])
+        imgid = line.split(' ')[0]
+        img_path = osp.join(image_dir, f"{imgid}.jpg")
+        imgid = int(imgid)
+        if is_train:
+            vid = f"{dataset_name}_{vid}"
+            imgid = f"{dataset_name}_{imgid}"
+        dataset.append((img_path, vid, imgid))
+
+    if is_train:
+        return dataset
+
+    random.shuffle(dataset)
+    vid_container = set()
+    query = []
+    gallery = []
+    for sample in dataset:
+        if sample[1] not in vid_container:
+            vid_container.add(sample[1])
+            gallery.append(sample)
         else:
-            random.shuffle(dataset)
-            vid_container = set()
-            query = []
-            gallery = []
-            for sample in dataset:
-                if sample[1] not in vid_container:
-                    vid_container.add(sample[1])
-                    gallery.append(sample)
-                else:
-                    query.append(sample)
+            query.append(sample)
 
-            return query, gallery
+    return query, gallery
+
+
+def _process_vehicleid_fixed_list(list_file, image_dir):
+    img_list_lines = open(list_file, 'r').readlines()
+
+    dataset = []
+    for line in img_list_lines:
+        line = line.strip()
+        if not line:
+            continue
+        imgid, vid = line.split()[:2]
+        dataset.append((osp.join(image_dir, f"{imgid}.jpg"), int(vid), int(imgid)))
+
+    return dataset
+
+
+class FixedVehicleID(VehicleID):
+    """VehicleID with a persisted query/gallery split for deterministic eval."""
+
+    fixed_split_dir = "fixed_split_seed5"
+    query_file = ""
+    gallery_file = ""
+
+    def __init__(self, root='datasets', **kwargs):
+        self.dataset_dir = osp.join(root, self.dataset_dir)
+
+        self.image_dir = osp.join(self.dataset_dir, 'image')
+        self.train_list = osp.join(self.dataset_dir, 'train_test_split/train_list.txt')
+        split_dir = osp.join(self.dataset_dir, 'train_test_split', self.fixed_split_dir)
+        self.query_list = osp.join(split_dir, self.query_file)
+        self.gallery_list = osp.join(split_dir, self.gallery_file)
+
+        required_files = [
+            self.dataset_dir,
+            self.image_dir,
+            self.train_list,
+            self.query_list,
+            self.gallery_list,
+        ]
+        self.check_before_run(required_files)
+
+        train = _process_vehicleid_list(self.train_list, self.image_dir, self.dataset_name, is_train=True)
+        query = _process_vehicleid_fixed_list(self.query_list, self.image_dir)
+        gallery = _process_vehicleid_fixed_list(self.gallery_list, self.image_dir)
+
+        ImageDataset.__init__(self, train, query, gallery, **kwargs)
 
 
 @DATASET_REGISTRY.register()
@@ -124,3 +175,27 @@ class LargeVehicleID(VehicleID):
         self.test_list = osp.join(dataset_dir, 'train_test_split/test_list_2400.txt')
 
         super(LargeVehicleID, self).__init__(root, self.test_list, **kwargs)
+
+
+@DATASET_REGISTRY.register()
+class FixedSmallVehicleID(FixedVehicleID):
+    """Small VehicleID using a persisted seed-5 query/gallery split."""
+
+    query_file = "test_list_800_query.txt"
+    gallery_file = "test_list_800_gallery.txt"
+
+
+@DATASET_REGISTRY.register()
+class FixedMediumVehicleID(FixedVehicleID):
+    """Medium VehicleID using a persisted seed-5 query/gallery split."""
+
+    query_file = "test_list_1600_query.txt"
+    gallery_file = "test_list_1600_gallery.txt"
+
+
+@DATASET_REGISTRY.register()
+class FixedLargeVehicleID(FixedVehicleID):
+    """Large VehicleID using a persisted seed-5 query/gallery split."""
+
+    query_file = "test_list_2400_query.txt"
+    gallery_file = "test_list_2400_gallery.txt"

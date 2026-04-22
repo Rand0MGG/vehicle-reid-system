@@ -45,7 +45,7 @@ def main():
     parser = argparse.ArgumentParser(description="Diagnose one FastReID training step.")
     parser.add_argument(
         "--config-file",
-        default=os.path.join("configs", "vehicle_reid.yml"),
+        default=os.path.join("configs", "veri_r50ibn_sbs_s0_v1.yml"),
         help="path to the training config",
     )
     parser.add_argument(

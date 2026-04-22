@@ -1,0 +1,22 @@
+_BASE_: "../fastreid/configs/VeRi/sbs_R50-ibn.yml"
+
+MODEL:
+  LOSSES:
+    NAME: ("CrossEntropyLoss", "WRTLoss",)
+    WRT:
+      NORM_FEAT: False
+      SCALE: 1.0
+
+SOLVER:
+  AMP:
+    ENABLED: False
+  IMS_PER_BATCH: 32
+  MAX_EPOCH: 60
+
+DATALOADER:
+  NUM_INSTANCE: 8
+
+TEST:
+  IMS_PER_BATCH: 64
+
+OUTPUT_DIR: "outputs/veri_r50ibn_wrt_s1_v1_20260411"

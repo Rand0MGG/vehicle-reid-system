@@ -64,14 +64,14 @@ const showHeader = computed(() => {
   min-height: 100%;
   padding: 28px;
   border: 1px solid var(--border-soft);
-  border-radius: 28px;
+  border-radius: 8px;
   background: var(--surface-card);
   box-shadow: var(--shadow-whisper);
 }
 
 .section-card.compact {
   padding: 22px;
-  border-radius: 24px;
+  border-radius: 8px;
 }
 
 .tone-muted {
@@ -143,7 +143,7 @@ const showHeader = computed(() => {
   .section-card,
   .section-card.compact {
     padding: 22px;
-    border-radius: 24px;
+    border-radius: 8px;
   }
 
   .section-header {

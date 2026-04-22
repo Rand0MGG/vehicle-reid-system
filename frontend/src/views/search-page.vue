@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="app-page">
     <div class="app-shell">
       <section class="search-header">
@@ -6,14 +6,14 @@
           <p class="search-eyebrow">Vehicle ReID Frontend</p>
           <h1>车辆检索前台</h1>
           <p class="search-description">
-            上传查询图像后即可开始检索。模型切换由管理员统一处理，前台只保留必要的检索参数与结果展示。
+            选择管理员发布的模型，上传查询图像后即可开始检索。Fast 使用全局特征，Pro 使用完整 concat 特征。
           </p>
         </div>
 
         <div class="search-side">
           <div class="header-meta">
             <span class="app-chip">当前身份 <strong>{{ roleLabel }}</strong></span>
-            <span class="app-chip">运行设备 <strong>{{ modelState.device || '未知' }}</strong></span>
+            <span class="app-chip">可用模型 <strong>{{ publicModels.length }}</strong></span>
           </div>
 
           <div class="header-actions">
@@ -23,20 +23,7 @@
         </div>
       </section>
 
-      <StatusBanner
-        v-if="modelErrorMessage"
-        tone="danger"
-        title="模型信息读取失败"
-        :message="modelErrorMessage"
-      />
-
-      <StatusBanner
-        v-if="searchBlocked"
-        tone="warning"
-        :title="searchBlockedTitle"
-        :message="searchBlockedMessage"
-      />
-
+      <StatusBanner v-if="modelError" tone="danger" title="模型列表读取失败" :message="modelError" />
       <StatusBanner :tone="feedback.tone" :title="feedback.title" :message="feedback.message" />
 
       <div class="workspace-grid">
@@ -52,29 +39,60 @@
         <SectionCard
           eyebrow="Search"
           title="设置检索参数"
-          description="当前前台只开放返回结果数量设置，模型由管理员统一维护。"
+          description="模型、特征视图和深度思考都在本次查询中明确提交。"
         >
+          <el-form label-position="top" class="parameter-form">
+            <el-form-item label="选择模型">
+              <el-select v-model="selectedModelId" placeholder="请选择模型" filterable @change="handleModelChange">
+                <el-option
+                  v-for="model in publicModels"
+                  :key="model.id"
+                  :label="`${model.name} · ${model.full_feature_dim || '--'} 维`"
+                  :value="model.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-form>
+
           <div class="parameter-stats">
+            <StatCard label="当前模型" :value="selectedModel?.name || '未选择模型'" :hint="selectedModel?.description || '请选择模型'" text />
             <StatCard
-              label="当前模型"
-              :value="modelState.current || '尚未读取到模型'"
-              hint="当前检索正在使用的模型文件"
-              mono
+              label="特征视图"
+              :value="searchMode === 'pro' ? `${selectedModel?.full_feature_dim || 0} 维` : `${selectedModel?.global_feature_dim || 0} 维`"
+              :hint="searchMode === 'pro' ? 'Pro 使用完整 concat 特征' : 'Fast 截取完整向量的 global 部分'"
+              number
             />
-            <StatCard
-              label="图库特征模型"
-              :value="modelState.gallery || '尚未记录'"
-              hint="当前图库中的特征数据由这个模型计算得到"
-              mono
-            />
-            <StatCard
-              label="最近耗时"
-              :value="searched ? formatDuration(timeCost) : '--'"
-              hint="完成一次检索后更新"
-            />
+            <StatCard label="最近耗时" :value="searched ? formatDuration(timeCost) : '--'" hint="完成一次检索后更新" number />
           </div>
 
           <el-form label-position="top" class="parameter-form">
+            <el-form-item label="检索模式">
+              <el-radio-group v-model="searchMode" class="mode-segment">
+                <el-radio-button label="fast">Fast</el-radio-button>
+                <el-tooltip :disabled="!proDisabled" content="当前模型不支持 Pro 检索" placement="top">
+                  <span>
+                    <el-radio-button label="pro" :disabled="proDisabled">Pro</el-radio-button>
+                  </span>
+                </el-tooltip>
+              </el-radio-group>
+            </el-form-item>
+
+            <el-form-item label="深度思考">
+              <div class="deep-thinking-row">
+                <el-tooltip :disabled="!deepThinkingDisabled" :content="deepThinkingDisabledReason" placement="top">
+                  <span>
+                    <el-switch
+                      v-model="deepThinking"
+                      :disabled="deepThinkingDisabled"
+                      active-text="开启"
+                      inactive-text="关闭"
+                    />
+                  </span>
+                </el-tooltip>
+                <p>开启后只在当前特征矩阵上重新排序，不重新读取图片，也不重写数据库。</p>
+              </div>
+            </el-form-item>
+
             <el-form-item label="返回结果数量">
               <el-slider v-model="topK" :min="1" :max="maxResults" show-input />
             </el-form-item>
@@ -92,12 +110,16 @@
           </el-form>
 
           <div class="helper-note">
-            <strong>当前可调整内容</strong>
-            <p>当前前台只允许调整返回结果数量。可上传格式由后台统一配置，时间范围过滤暂未启用。</p>
+            <strong>{{ searched ? '本次检索' : '当前可用能力' }}</strong>
+            <p>
+              {{ searched
+                ? `模式 ${searchMeta.searchMode.toUpperCase()}，特征 ${searchMeta.featureDim || '--'} 维，深度思考${searchMeta.deepThinkingUsed ? '已启用' : '未启用'}。`
+                : capabilityText }}
+            </p>
           </div>
 
           <ActionBar align="left">
-            <el-button type="primary" :loading="loading" :disabled="searchBlocked" @click="handleSearch">
+            <el-button type="primary" :loading="loading" :disabled="searchDisabled" @click="handleSearch">
               {{ loading ? '正在执行检索...' : '开始检索' }}
             </el-button>
             <el-button plain :disabled="!currentFileName" @click="resetQuery">重置当前查询</el-button>
@@ -111,7 +133,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import ActionBar from '@/components/base/action-bar.vue'
@@ -120,19 +142,25 @@ import StatCard from '@/components/base/stat-card.vue'
 import StatusBanner from '@/components/base/status-banner.vue'
 import QueryUploadPanel from '@/components/search/query-upload-panel.vue'
 import ResultGrid from '@/components/search/result-grid.vue'
-import { useModelState } from '@/composables/use-model-state'
+import { fetchPublicModels } from '@/api/search'
 import { useSearchWorkflow } from '@/composables/use-search-workflow'
 import { useSession } from '@/composables/use-session'
-import { formatDuration, getRoleLabel } from '@/utils/formatters'
+import { formatDuration, getRoleLabel, normalizeProfile } from '@/utils/formatters'
 
 const router = useRouter()
 const { role, isAdmin, syncSession, logoutAndRedirect } = useSession(router)
+const publicModels = ref([])
+const modelError = ref('')
 const {
   loading,
   searched,
   topK,
   maxResults,
   allowedQuerySuffixes,
+  selectedModelId,
+  searchMode,
+  deepThinking,
+  searchMeta,
   dateRange,
   file,
   previewUrl,
@@ -145,68 +173,72 @@ const {
   executeSearch,
   cleanup
 } = useSearchWorkflow()
-const {
-  errorMessage: modelErrorMessage,
-  modelState,
-  loadModelState
-} = useModelState()
 
 const roleLabel = computed(() => getRoleLabel(role.value))
 const currentFileName = computed(() => file.value?.name || '')
-const galleryModelUnknown = computed(
-  () => modelState.value.galleryHasRecords && !modelState.value.galleryModelKnown
-)
-const galleryModelMismatch = computed(
-  () => modelState.value.galleryModelKnown && !modelState.value.galleryMatchesCurrent
-)
-const searchBlocked = computed(() => galleryModelUnknown.value || galleryModelMismatch.value)
-const searchBlockedTitle = computed(() => (
-  galleryModelUnknown.value ? '图库特征模型尚未记录' : '当前模型与图库特征模型不一致'
+const selectedModel = computed(() => publicModels.value.find((item) => Number(item.id) === Number(selectedModelId.value)) || null)
+const proDisabled = computed(() => !selectedModel.value?.supports_concat)
+const deepThinkingDisabled = computed(() => !selectedModel.value?.supports_rerank)
+const deepThinkingDisabledReason = computed(() => (
+  selectedModel.value?.supports_rerank ? '当前图库规模超过深度思考上限' : '当前模型不支持深度思考'
 ))
-const searchBlockedMessage = computed(() => {
-  if (galleryModelUnknown.value) {
-    return '当前图库已有特征数据，但没有记录它使用的模型。请联系管理员重新处理全部图片后再检索。'
+const searchDisabled = computed(() => loading.value || !selectedModel.value)
+const capabilityText = computed(() => {
+  if (!selectedModel.value) {
+    return '请选择一个管理员发布的模型。'
   }
-
-  return '当前检索已暂时停用，请联系管理员在后台重新处理全部图片后再继续检索。'
+  return `Fast 使用 ${selectedModel.value.global_feature_dim} 维，Pro 使用 ${selectedModel.value.full_feature_dim} 维。`
 })
-const queryAccept = computed(() => {
-  if (!allowedQuerySuffixes.value.length) {
-    return 'image/*'
-  }
-
-  return allowedQuerySuffixes.value.join(',')
-})
+const queryAccept = computed(() => allowedQuerySuffixes.value.length ? allowedQuerySuffixes.value.join(',') : 'image/*')
 const uploadHelperMessage = computed(() => {
   if (!allowedQuerySuffixes.value.length) {
     return '建议上传主体清晰、角度稳定的车辆图像。'
   }
-
   return `建议上传主体清晰、角度稳定的车辆图像。当前支持：${allowedQuerySuffixes.value.join(', ')}`
 })
 
-const loadSearchContext = async () => {
+const applySelectedModelDefaults = () => {
+  const model = selectedModel.value
+  applyRuntimeDefaults({
+    selectedModel: model,
+    supportsPro: Boolean(model?.supports_concat),
+    supportsDeepThinking: Boolean(model?.supports_rerank)
+  })
+}
+
+const handleModelChange = () => {
+  applySelectedModelDefaults()
+}
+
+const loadPublicModels = async () => {
+  modelError.value = ''
   try {
-    await loadModelState()
+    const response = await fetchPublicModels()
+    publicModels.value = Array.isArray(response.data?.items)
+      ? response.data.items.map(normalizeProfile)
+      : []
     applyRuntimeDefaults({
-      defaultTopK: modelState.value.searchDefaultTopK,
-      maxResultLimit: modelState.value.maxResults,
-      allowedSuffixes: modelState.value.allowedQuerySuffixes
+      defaultTopK: response.data?.search_default_top_k,
+      maxResultLimit: response.data?.max_results,
+      allowedSuffixes: response.data?.allowed_query_suffixes
     })
+    if (!selectedModelId.value && publicModels.value.length) {
+      selectedModelId.value = Number(publicModels.value[0].id)
+    }
+    applySelectedModelDefaults()
   } catch {
-    // Inline banner already describes the failure state.
+    modelError.value = '请确认后端服务可用，并且管理员已经发布至少一个模型。'
   }
 }
 
 const handleSearch = async () => {
   try {
     const response = await executeSearch()
-
     if (response) {
       ElMessage.success(`检索完成，共返回 ${response.total_found} 条结果。`)
     }
   } catch {
-    // Error state is shown inline and by the request layer.
+    // The request layer and inline status banner provide the error message.
   }
 }
 
@@ -217,7 +249,7 @@ const handleLogout = async () => {
 
 onMounted(() => {
   syncSession()
-  loadSearchContext()
+  loadPublicModels()
 })
 
 onBeforeUnmount(() => {
@@ -232,7 +264,7 @@ onBeforeUnmount(() => {
   gap: 20px;
   padding: 24px 28px;
   border: 1px solid var(--border-soft);
-  border-radius: 28px;
+  border-radius: 8px;
   background: var(--surface-panel);
   box-shadow: var(--shadow-whisper);
 }
@@ -280,7 +312,7 @@ onBeforeUnmount(() => {
 
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.9fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
   gap: 20px;
   align-items: stretch;
 }
@@ -289,19 +321,50 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 18px;
+  margin: 8px 0 18px;
 }
 
-.parameter-form :deep(.el-form-item) + :deep(.el-form-item) {
-  margin-top: 8px;
+.mode-segment {
+  padding: 4px;
+  border: 1px solid rgba(171, 96, 67, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 250, 244, 0.78);
+  box-shadow: 0 0 0 4px rgba(171, 96, 67, 0.08);
+}
+
+.mode-segment :deep(.el-radio-button__inner) {
+  border-radius: 6px;
+  border: 0;
+  font-weight: 700;
+}
+
+.mode-segment :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: #a75f42;
+  border-color: #a75f42;
+  box-shadow: none;
+}
+
+.deep-thinking-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.deep-thinking-row p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .helper-note {
   margin: 18px 0 20px;
   padding: 16px 18px;
-  border: 1px solid var(--border-soft);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(171, 96, 67, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 250, 244, 0.68);
+  box-shadow: 0 12px 28px rgba(91, 55, 38, 0.08);
 }
 
 .helper-note strong {

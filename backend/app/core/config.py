@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     BASE_DIR: str = str(BACKEND_DIR)
     DATASETS_DIR: str = str(REPO_ROOT / "datasets")
     GALLERY_DIR: str = str(REPO_ROOT / "datasets" / "gallery")
-    MODEL_CONFIG_FILE: str = str(REPO_ROOT / "configs" / "vehicle_reid.yml")
+    MODEL_CONFIG_FILE: str = str(REPO_ROOT / "configs" / "veri_r50ibn_sbs_s0_v1.yml")
     MODEL_WEIGHTS_FILE: str = str(REPO_ROOT / "outputs" / "model_final.pth")
     SEARCH_UPLOAD_DIR: str = str(REPO_ROOT / "tmp" / "search_uploads")
 

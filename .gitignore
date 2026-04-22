@@ -10,14 +10,28 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.codex_pdf_venv
 
 build/
 venv/
 reid_env/
+.venv/
+.conda/
+.pytest_cache/
+.mypy_cache/
 
 /outputs/
-/datasets/
+/datasets/*
+!/datasets/vehicleid/
+/datasets/vehicleid/*
+!/datasets/vehicleid/train_test_split/
+/datasets/vehicleid/train_test_split/*
+!/datasets/vehicleid/train_test_split/fixed_split_seed5/
+!/datasets/vehicleid/train_test_split/fixed_split_seed5/*.txt
+!/datasets/vehicleid/train_test_split/fixed_split_seed5/README.md
 /tmp/
+/doc/*
+!/doc/VERSION.md
 
 frontend/dist/
 frontend/node_modules/
@@ -27,9 +41,19 @@ backend/app/core/model_preferences.json
 backend/app/core/system_config.json
 
 *.log
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.npy
+*.npz
+events.out.tfevents*
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+
+.DS_Store
+Thumbs.db
 
 fastreid/datasets/
 fastreid/datasets_original/

@@ -1,0 +1,22 @@
+_BASE_: "../fastreid/configs/VeRi/sbs_R50-ibn.yml"
+
+SEED: 3408
+
+MODEL:
+  BACKBONE:
+    WITH_NL: False
+
+SOLVER:
+  AMP:
+    ENABLED: True
+  IMS_PER_BATCH: 64
+  MAX_EPOCH: 60
+
+DATALOADER:
+  NUM_INSTANCE: 16
+
+TEST:
+  EVAL_PERIOD: 5
+  IMS_PER_BATCH: 128
+
+OUTPUT_DIR: "outputs/veri_r50ibn_sbs_s0_amp64_nonl_seed2_v1_20260414"

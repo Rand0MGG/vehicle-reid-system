@@ -2,81 +2,144 @@ import logging
 
 from sqlalchemy import inspect, text
 
-from app.core.security import get_password_hash
-from app.db.session import SessionLocal, engine
-from app.models.user import User
+from app.db.session import engine
+from app.models.base import Base
+
+# Import models so SQLAlchemy metadata knows every table.
+from app.models.model_profile import ModelProfile, ModelRevision  # noqa: F401
+from app.models.sys_log_model import SysLog  # noqa: F401
+from app.models.system_config_model import SystemConfig  # noqa: F401
+from app.models.user import User  # noqa: F401
+from app.models.vehicle import Camera, FeatureBuildTask, GalleryFeature, GalleryImage, VehicleIdentity  # noqa: F401
 
 
 logger = logging.getLogger(__name__)
 
 
-def _ensure_user_builtin_column() -> None:
-    inspector = inspect(engine)
-    table_names = set(inspector.get_table_names())
+REQUIRED_COLUMNS = {
+    "model_profile": {
+        "id",
+        "name",
+        "description",
+        "is_enabled",
+        "is_public",
+        "display_order",
+        "active_revision_id",
+        "created_at",
+        "updated_at",
+    },
+    "model_revision": {
+        "id",
+        "model_profile_id",
+        "revision_name",
+        "weights_file",
+        "config_file",
+        "supports_concat",
+        "supports_rerank",
+        "global_feature_dim",
+        "full_feature_dim",
+        "fast_inference_mode",
+        "pro_inference_mode",
+        "signature",
+        "created_at",
+    },
+    "gallery_image": {
+        "id",
+        "vehicle_identity_id",
+        "camera_id",
+        "capture_time",
+        "img_path",
+        "img_path_hash",
+        "file_hash",
+        "file_size",
+        "width",
+        "height",
+        "created_by",
+        "created_at",
+        "updated_at",
+    },
+    "gallery_feature": {
+        "id",
+        "image_id",
+        "model_revision_id",
+        "feature",
+        "created_at",
+        "updated_at",
+    },
+    "feature_build_task": {
+        "id",
+        "model_revision_id",
+        "triggered_by",
+        "mode",
+        "status",
+        "total_images",
+        "processed_images",
+        "success_count",
+        "failed_count",
+        "message",
+        "created_at",
+        "started_at",
+        "finished_at",
+    },
+}
 
-    if "sys_user" not in table_names:
-        return
 
-    columns = {column["name"] for column in inspector.get_columns("sys_user")}
-    with engine.begin() as connection:
-        if "is_builtin" not in columns:
-            logger.info("Adding sys_user.is_builtin compatibility column")
-            connection.execute(
-                text(
-                    """
-                    ALTER TABLE sys_user
-                    ADD COLUMN is_builtin TINYINT(1) NOT NULL DEFAULT 0
-                    """
-                )
-            )
-
-        connection.execute(text("UPDATE sys_user SET is_builtin = 1 WHERE username = 'admin'"))
-
-        builtin_count = connection.execute(
-            text("SELECT COUNT(*) FROM sys_user WHERE is_builtin = 1")
-        ).scalar() or 0
-        if builtin_count == 0:
-            connection.execute(
-                text(
-                    """
-                    UPDATE sys_user
-                    SET is_builtin = 1
-                    WHERE id = (
-                        SELECT min_id
-                        FROM (
-                            SELECT MIN(id) AS min_id
-                            FROM sys_user
-                            WHERE role = 'admin'
-                        ) AS builtin_admin
-                    )
-                    """
-                )
-            )
+DROP_GROUPS = {
+    "model": ("feature_build_task", "gallery_feature", "model_revision", "model_profile"),
+    "gallery": ("feature_build_task", "gallery_feature", "gallery_image", "camera", "vehicle_identity"),
+    "legacy": ("vehicle_feature",),
+}
 
 
-def _hash_builtin_plaintext_passwords() -> None:
-    session = SessionLocal()
+def _table_columns(inspector, table_name: str) -> set[str]:
+    if not inspector.has_table(table_name):
+        return set()
+    return {column["name"] for column in inspector.get_columns(table_name)}
 
+
+def _is_incompatible(inspector, table_name: str) -> bool:
+    if not inspector.has_table(table_name):
+        return False
+    required = REQUIRED_COLUMNS.get(table_name, set())
+    return not required.issubset(_table_columns(inspector, table_name))
+
+
+def _drop_tables(conn, table_names: tuple[str, ...]) -> None:
+    conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
     try:
-        builtin_users = session.query(User).filter(User.is_builtin.is_(True)).all()
-        updated = False
-
-        for user in builtin_users:
-            if not user.password.startswith("$2"):
-                logger.info("Hashing plaintext password for builtin user '%s'", user.username)
-                user.password = get_password_hash(user.password)
-                updated = True
-
-        if updated:
-            session.commit()
-    except Exception:
-        session.rollback()
-        logger.exception("Failed to normalize builtin user passwords during startup migration")
-        raise
+        for table_name in table_names:
+            conn.execute(text(f"DROP TABLE IF EXISTS `{table_name}`"))
+            logger.warning("Dropped incompatible table: %s", table_name)
     finally:
-        session.close()
+        conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+
+
+def drop_incompatible_development_tables() -> None:
+    """Drop old development tables that cannot safely run with the new schema.
+
+    User, log, and system config tables are intentionally preserved. Model and
+    gallery feature data from older schemas are discarded instead of being
+    adapted into the new 3NF design.
+    """
+
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+
+        if inspector.has_table("vehicle_feature"):
+            _drop_tables(conn, DROP_GROUPS["legacy"])
+            inspector = inspect(conn)
+
+        if any(_is_incompatible(inspector, table) for table in ("model_profile", "model_revision")):
+            _drop_tables(conn, DROP_GROUPS["model"])
+            inspector = inspect(conn)
+
+        if any(_is_incompatible(inspector, table) for table in ("gallery_image", "gallery_feature", "feature_build_task")):
+            _drop_tables(conn, DROP_GROUPS["gallery"])
 
 
 def run_startup_migrations() -> None:
-    _ensure_user_builtin_column()
-    _hash_builtin_plaintext_passwords()
+    """Create the current database structure without seeding users."""
+
+    drop_incompatible_development_tables()
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database structure checked")

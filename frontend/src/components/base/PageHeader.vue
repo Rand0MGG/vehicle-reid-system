@@ -43,7 +43,7 @@ defineProps({
   gap: 24px;
   padding: 32px;
   border: 1px solid var(--border-soft);
-  border-radius: 32px;
+  border-radius: 8px;
   background: var(--surface-panel);
   box-shadow: var(--shadow-whisper);
 }
@@ -96,7 +96,7 @@ defineProps({
 @media (max-width: 960px) {
   .page-header {
     padding: 24px;
-    border-radius: 24px;
+    border-radius: 8px;
     flex-direction: column;
   }
 

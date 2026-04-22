@@ -1,72 +1,47 @@
-import sys
 import os
-from sqlalchemy import text
+import sys
 
-# 确保能找到 app 模块
 sys.path.append(os.getcwd())
 
 from app.db.session import SessionLocal
-from app.models.vehicle import VehicleFeature
-from app.models.user import User  # 【新增】引入用户模型
+from app.models.model_profile import ModelProfile, ModelRevision
+from app.models.user import User
+from app.models.vehicle import GalleryFeature, GalleryImage
 
-def inspect_data():
+
+def inspect_data() -> None:
     session = SessionLocal()
     try:
-        # ==========================================
-        # 1. 检查 User 表 (sys_user)
-        # ==========================================
-        print("\n" + "="*50)
-        print("👤 正在查询 sys_user 表...")
-        print("="*50)
-        
-        users = session.query(User).all()
-        
+        users = session.query(User).order_by(User.id.asc()).all()
+        images = session.query(GalleryImage).order_by(GalleryImage.id.asc()).limit(20).all()
+        profile_count = session.query(ModelProfile).count()
+        revision_count = session.query(ModelRevision).count()
+        feature_count = session.query(GalleryFeature).count()
+
+        print("\nUsers")
+        print("=" * 72)
         if not users:
-            print("⚠️ User 表是空的！")
-        else:
-            print(f"📊 共发现 {len(users)} 个用户：")
-            print("-" * 60)
-            # 打印表头
-            print(f"{'ID':<5} | {'Username':<15} | {'Role':<10} | {'Create Time'}")
-            print("-" * 60)
+            print("sys_user is empty.")
+        for user in users:
+            created = user.create_time.strftime("%Y-%m-%d %H:%M:%S") if user.create_time else "-"
+            print(f"{user.id:<4} {user.username:<20} {user.role:<10} {created}")
 
-            for u in users:
-                create_time = u.create_time.strftime("%Y-%m-%d %H:%M") if u.create_time else "N/A"
-                print(f"{u.id:<5} | {u.username:<15} | {u.role:<10} | {create_time}")
+        print("\nGallery")
+        print("=" * 72)
+        print(f"images={session.query(GalleryImage).count()} features={feature_count}")
+        for image in images:
+            vehicle_code = image.vehicle_identity.vehicle_code if image.vehicle_identity else "-"
+            camera_code = image.camera.camera_code if image.camera else "-"
+            print(f"{image.id:<4} {vehicle_code:<16} {camera_code:<10} {image.img_path}")
 
-        # ==========================================
-        # 2. 检查 VehicleFeature 表 (vehicle_feature)
-        # ==========================================
-        print("\n" + "="*50)
-        print("🚗 正在查询 vehicle_feature 表...")
-        print("="*50)
-        
-        records = session.query(VehicleFeature).all()
-        
-        if not records:
-            print("⚠️ VehicleFeature 表是空的！")
-        else:
-            print(f"📊 共发现 {len(records)} 条车辆记录：")
-            print("-" * 90)
-            # 打印表头
-            print(f"{'ID':<5} | {'Vehicle ID':<12} | {'Cam ID':<8} | {'Time':<20} | {'Img Path'}")
-            print("-" * 90)
-
-            for r in records:
-                # 这里我们不再打印 Feature Size，以免产生误解
-                # 而是打印图片路径，这样更直观
-                time_str = r.capture_time.strftime("%Y-%m-%d %H:%M:%S") if r.capture_time else "None"
-                # 截取路径后半段显示，防止太长
-                short_path = r.img_path  # 不截断，直接显示全名
-                
-                print(f"{r.id:<5} | {r.vehicle_id:<12} | {r.cam_id:<8} | {time_str:<20} | {short_path}")
-        
-        print("\n✅ 所有表检查完毕。")
-
-    except Exception as e:
-        print(f"❌ 查询出错: {e}")
+        print("\nModels")
+        print("=" * 72)
+        print(f"profiles={profile_count} revisions={revision_count}")
+    except Exception as exc:
+        print(f"Inspect failed: {exc}")
     finally:
         session.close()
+
 
 if __name__ == "__main__":
     inspect_data()

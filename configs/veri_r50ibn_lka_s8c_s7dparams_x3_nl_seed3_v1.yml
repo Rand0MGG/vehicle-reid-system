@@ -1,0 +1,45 @@
+_BASE_: "../fastreid/configs/VeRi/sbs_R50-ibn.yml"
+
+SEED: 3
+
+MODEL:
+  BACKBONE:
+    NAME: build_resnet_lka_stack_backbone
+    WITH_NL: True
+    LKA:
+      ENABLED: True
+      STAGES: ("layer4",)
+      NUM_BLOCKS: 3
+      GAMMA_INIT: 0.05
+      LR_FACTOR: 1.0
+      FREEZE_WITH_BACKBONE: False
+      OUTPUT_MODE: gated_residual
+      RESIDUAL_NORM: ratio_clamp
+      MAX_RAW_NORM_RATIO: 2.0
+      GAMMA_WARMUP_ENABLED: True
+      GAMMA_WARMUP_ITERS: 3000
+      GAMMA_WARMUP_START: 0.0
+      GAMMA_WARMUP_END: 1.0
+      GAMMA_PARAMETERIZATION: sigmoid_range
+      GAMMA_CLAMP_MIN: 0.025
+      GAMMA_CLAMP_MAX: 0.1
+      NORM_EPS: 1e-6
+    HCA:
+      ENABLED: False
+
+SOLVER:
+  AMP:
+    ENABLED: True
+  IMS_PER_BATCH: 64
+  MAX_EPOCH: 60
+
+DATALOADER:
+  NUM_INSTANCE: 16
+
+TEST:
+  EVAL_PERIOD: 5
+  IMS_PER_BATCH: 64
+  NUM_WORKERS: 0
+  PIN_MEMORY: False
+
+OUTPUT_DIR: "outputs/veri_r50ibn_lka_s8c_s7dparams_x3_nl_amp64_seed3_v1_20260418"

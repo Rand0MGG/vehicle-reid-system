@@ -14,11 +14,15 @@ DEFAULT_SYSTEM_CONFIG = {
     "similarity_threshold": 0.5,
     "max_results": 50,
     "search_default_top_k": 10,
+    "max_deep_thinking_gallery_size": 5000,
     "gallery_poll_interval_ms": 1500,
     "allowed_query_suffixes": list(DEFAULT_ALLOWED_QUERY_SUFFIXES),
+    "file_browser_roots": [
+        str(Path(settings.DATASETS_DIR).resolve()),
+        str((Path(settings.BASE_DIR).resolve().parent / "outputs").resolve()),
+        str((Path(settings.BASE_DIR).resolve().parent / "configs").resolve()),
+    ],
     "log_level": "INFO",
-    "current_model_file": "",
-    "gallery_model_file": "",
 }
 
 
@@ -58,6 +62,23 @@ def _normalize_suffixes(values: Any) -> list[str]:
     return suffixes or list(DEFAULT_ALLOWED_QUERY_SUFFIXES)
 
 
+def _normalize_path_list(values: Any) -> list[str]:
+    candidates: Iterable[Any]
+    if isinstance(values, str):
+        candidates = values.split(",")
+    elif isinstance(values, list):
+        candidates = values
+    else:
+        candidates = DEFAULT_SYSTEM_CONFIG["file_browser_roots"]
+
+    paths = []
+    for value in candidates:
+        path = str(value or "").strip()
+        if path and path not in paths:
+            paths.append(path)
+    return paths or list(DEFAULT_SYSTEM_CONFIG["file_browser_roots"])
+
+
 def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     normalized = dict(DEFAULT_SYSTEM_CONFIG)
 
@@ -80,6 +101,10 @@ def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str,
     if isinstance(search_default_top_k, (int, float)):
         normalized["search_default_top_k"] = max(1, int(search_default_top_k))
 
+    max_deep_thinking_gallery_size = data.get("max_deep_thinking_gallery_size")
+    if isinstance(max_deep_thinking_gallery_size, (int, float)):
+        normalized["max_deep_thinking_gallery_size"] = max(1, int(max_deep_thinking_gallery_size))
+
     gallery_poll_interval_ms = data.get("gallery_poll_interval_ms")
     if isinstance(gallery_poll_interval_ms, (int, float)):
         normalized["gallery_poll_interval_ms"] = max(500, int(gallery_poll_interval_ms))
@@ -87,17 +112,12 @@ def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str,
     normalized["allowed_query_suffixes"] = _normalize_suffixes(
         data.get("allowed_query_suffixes", DEFAULT_ALLOWED_QUERY_SUFFIXES)
     )
+    normalized["file_browser_roots"] = _normalize_path_list(data.get("file_browser_roots"))
 
     log_level = data.get("log_level")
     if isinstance(log_level, str) and log_level.strip():
         normalized["log_level"] = log_level.strip()
 
-    current_model_file = _normalize_model_name(data.get("current_model_file"))
-    if not current_model_file:
-        current_model_file = _normalize_model_name(data.get("default_model_file"))
-    normalized["current_model_file"] = current_model_file
-
-    normalized["gallery_model_file"] = _normalize_model_name(data.get("gallery_model_file"))
     normalized["search_default_top_k"] = min(
         normalized["search_default_top_k"],
         normalized["max_results"],
@@ -129,18 +149,8 @@ def _write_system_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _migrate_legacy_model_preferences(config: Dict[str, Any]) -> Dict[str, Any]:
-    if config.get("current_model_file"):
-        return config
-
-    legacy_default_model = _normalize_model_name(
-        _read_json_file(LEGACY_MODEL_PREFERENCES_PATH).get("default_model_file")
-    )
-    if not legacy_default_model:
-        return config
-
-    migrated_config = dict(config)
-    migrated_config["current_model_file"] = legacy_default_model
-    return _write_system_config(migrated_config)
+    _ = LEGACY_MODEL_PREFERENCES_PATH
+    return config
 
 
 def load_system_config() -> Dict[str, Any]:
@@ -154,7 +164,5 @@ def save_system_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def has_gallery_model_mismatch(config: Optional[Dict[str, Any]] = None) -> bool:
-    runtime_config = _normalize_system_config(config or load_system_config())
-    current_model_file = runtime_config.get("current_model_file", "")
-    gallery_model_file = runtime_config.get("gallery_model_file", "")
-    return bool(current_model_file and gallery_model_file and current_model_file != gallery_model_file)
+    _ = config
+    return False

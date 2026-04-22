@@ -16,6 +16,15 @@ export function useSearchWorkflow() {
   const topK = ref(10)
   const maxResults = ref(50)
   const allowedQuerySuffixes = ref([])
+  const selectedModelId = ref(0)
+  const searchMode = ref('fast')
+  const deepThinking = ref(false)
+  const searchMeta = ref({
+    searchMode: 'fast',
+    featureDim: 0,
+    deepThinkingRequested: false,
+    deepThinkingUsed: false
+  })
   const dateRange = ref([])
   const file = ref(null)
   const previewUrl = ref('')
@@ -42,6 +51,12 @@ export function useSearchWorkflow() {
     results.value = []
     timeCost.value = 0
     searched.value = false
+    searchMeta.value = {
+      searchMode: searchMode.value,
+      featureDim: 0,
+      deepThinkingRequested: deepThinking.value,
+      deepThinkingUsed: false
+    }
   }
 
   const handleFileChange = (uploadFile) => {
@@ -63,7 +78,7 @@ export function useSearchWorkflow() {
     setFeedback('neutral', '等待上传查询图像', describeSupportedFormats(allowedQuerySuffixes.value))
   }
 
-  const applyRuntimeDefaults = ({ defaultTopK, maxResultLimit, allowedSuffixes } = {}) => {
+  const applyRuntimeDefaults = ({ defaultTopK, maxResultLimit, allowedSuffixes, selectedModel, supportsPro, supportsDeepThinking } = {}) => {
     const normalizedMax = Number(maxResultLimit)
     if (Number.isFinite(normalizedMax)) {
       maxResults.value = Math.max(1, Math.round(normalizedMax))
@@ -83,11 +98,26 @@ export function useSearchWorkflow() {
     if (!file.value) {
       setFeedback('neutral', '等待上传查询图像', describeSupportedFormats(allowedQuerySuffixes.value))
     }
+
+    if (selectedModel?.id) {
+      selectedModelId.value = Number(selectedModel.id)
+    }
+
+    if (!supportsPro && searchMode.value === 'pro') {
+      searchMode.value = 'fast'
+    }
+    if (!supportsDeepThinking) {
+      deepThinking.value = false
+    }
   }
 
   const executeSearch = async () => {
     if (!file.value) {
       setFeedback('warning', '请先上传查询图像', '上传一张车辆图片后才能开始检索。')
+      return null
+    }
+    if (!selectedModelId.value) {
+      setFeedback('warning', '请先选择模型', '请选择一个管理员发布的模型后再检索。')
       return null
     }
 
@@ -98,12 +128,21 @@ export function useSearchWorkflow() {
       const formData = new FormData()
       formData.append('file', file.value)
       formData.append('top_k', String(topK.value))
+      formData.append('model_profile_id', String(selectedModelId.value))
+      formData.append('search_mode', searchMode.value)
+      formData.append('deep_thinking', deepThinking.value ? 'true' : 'false')
 
       const response = await searchVehicle(formData)
       const normalizedResults = normalizeSearchResults(response.data?.results)
 
       results.value = normalizedResults
       timeCost.value = Number(response.data?.time_cost) || 0
+      searchMeta.value = {
+        searchMode: response.data?.search_mode || searchMode.value,
+        featureDim: Number(response.data?.feature_dim ?? 0),
+        deepThinkingRequested: Boolean(response.data?.deep_thinking_requested),
+        deepThinkingUsed: Boolean(response.data?.deep_thinking_used)
+      }
       searched.value = true
 
       if (normalizedResults.length > 0) {
@@ -138,6 +177,10 @@ export function useSearchWorkflow() {
     topK,
     maxResults,
     allowedQuerySuffixes,
+    selectedModelId,
+    searchMode,
+    deepThinking,
+    searchMeta,
     dateRange,
     file,
     previewUrl,

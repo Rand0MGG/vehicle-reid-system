@@ -28,7 +28,7 @@ defineProps({
 .status-banner {
   padding: 14px 16px;
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.5);
 }
 

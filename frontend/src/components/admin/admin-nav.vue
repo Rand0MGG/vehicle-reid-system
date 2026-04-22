@@ -36,7 +36,7 @@ defineEmits(['select'])
 .admin-nav {
   padding: 18px;
   border: 1px solid var(--border-soft);
-  border-radius: 28px;
+  border-radius: 8px;
   background: var(--surface-card);
   box-shadow: var(--shadow-whisper);
 }
@@ -47,7 +47,7 @@ defineEmits(['select'])
   gap: 14px;
   padding: 14px;
   border: 0;
-  border-radius: 18px;
+  border-radius: 8px;
   background: transparent;
   text-align: left;
   cursor: pointer;
@@ -73,7 +73,7 @@ defineEmits(['select'])
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
   color: var(--text-accent);
   font-size: 12px;
@@ -115,7 +115,7 @@ defineEmits(['select'])
   .admin-nav {
     grid-template-columns: 1fr;
     padding: 14px;
-    border-radius: 22px;
+    border-radius: 8px;
   }
 }
 </style>

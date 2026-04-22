@@ -68,7 +68,7 @@ defineExpose({
 .terminal-shell {
   overflow: hidden;
   border: 1px solid var(--surface-dark-border);
-  border-radius: 22px;
+  border-radius: 8px;
   background: var(--surface-dark);
 }
 

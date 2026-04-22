@@ -2,7 +2,7 @@ _BASE_: "../fastreid/configs/VeRi/sbs_R50-ibn.yml"
 
 
 MODEL:
-    # --- 关键修改：禁止自动下载预训练权重 ---
+  # Keep the official SBS method and only apply runtime/hardware adaptations here.
   DEVICE: "cuda"
 
 SOLVER:

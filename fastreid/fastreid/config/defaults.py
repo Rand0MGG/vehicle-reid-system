@@ -46,6 +46,40 @@ _C.MODEL.BACKBONE.WITH_IBN = False
 _C.MODEL.BACKBONE.WITH_SE = False
 # If use Non-local block in backbone
 _C.MODEL.BACKBONE.WITH_NL = False
+# Opt-in Large Kernel Attention enhancer. The default keeps existing backbones
+# unchanged; LKA configs must switch to build_resnet_lka_backbone explicitly.
+_C.MODEL.BACKBONE.LKA = CN()
+_C.MODEL.BACKBONE.LKA.ENABLED = False
+_C.MODEL.BACKBONE.LKA.STAGES = ("layer4",)
+_C.MODEL.BACKBONE.LKA.GAMMA_INIT = 1e-6
+_C.MODEL.BACKBONE.LKA.ALPHA = 0.05
+_C.MODEL.BACKBONE.LKA.RESIDUAL_NORM = "none"
+_C.MODEL.BACKBONE.LKA.MAX_RAW_NORM_RATIO = 2.0
+_C.MODEL.BACKBONE.LKA.NORM_EPS = 1e-6
+_C.MODEL.BACKBONE.LKA.GAMMA_WARMUP_ENABLED = False
+_C.MODEL.BACKBONE.LKA.GAMMA_WARMUP_ITERS = 3000
+_C.MODEL.BACKBONE.LKA.GAMMA_WARMUP_START = 0.0
+_C.MODEL.BACKBONE.LKA.GAMMA_WARMUP_END = 1.0
+_C.MODEL.BACKBONE.LKA.GAMMA_PARAMETERIZATION = "direct"
+_C.MODEL.BACKBONE.LKA.GAMMA_CLAMP_MIN = 0.0
+_C.MODEL.BACKBONE.LKA.GAMMA_CLAMP_MAX = -1.0
+_C.MODEL.BACKBONE.LKA.LR_FACTOR = 1.0
+_C.MODEL.BACKBONE.LKA.FREEZE_WITH_BACKBONE = True
+_C.MODEL.BACKBONE.LKA.OUTPUT_MODE = "gated_residual"
+_C.MODEL.BACKBONE.LKA.NUM_BLOCKS = 1
+# Opt-in paper-style LKA stack. This is separate from the gated LKA path above
+# so old experiments keep their exact behavior.
+_C.MODEL.BACKBONE.PAPER_LKA = CN()
+_C.MODEL.BACKBONE.PAPER_LKA.ENABLED = False
+_C.MODEL.BACKBONE.PAPER_LKA.STAGES = ("layer4",)
+_C.MODEL.BACKBONE.PAPER_LKA.NUM_BLOCKS = 3
+# Opt-in Hybrid Channel Attention enhancer for the LKA ablation path.
+_C.MODEL.BACKBONE.HCA = CN()
+_C.MODEL.BACKBONE.HCA.ENABLED = False
+_C.MODEL.BACKBONE.HCA.LOCAL_SIZE = 5
+_C.MODEL.BACKBONE.HCA.LOCAL_WEIGHT = 0.5
+_C.MODEL.BACKBONE.HCA.KERNEL_SIZE = 5
+_C.MODEL.BACKBONE.HCA.GAMMA_INIT = 1e-6
 # Vision Transformer options
 _C.MODEL.BACKBONE.SIE_COE = 3.0
 _C.MODEL.BACKBONE.STRIDE_SIZE = (16, 16)
@@ -75,12 +109,69 @@ _C.MODEL.HEADS.NECK_FEAT = "before"  # options: before, after
 # Pooling layer type
 _C.MODEL.HEADS.POOL_LAYER = "GlobalAvgPool"
 
+# Opt-in Residual MLP stack used by ResidualMLPEmbeddingHead.
+_C.MODEL.HEADS.MLP = CN()
+_C.MODEL.HEADS.MLP.NUM_BLOCKS = 1
+_C.MODEL.HEADS.MLP.HIDDEN_DIM = 512
+_C.MODEL.HEADS.MLP.BETA_INIT = 0.1
+_C.MODEL.HEADS.MLP.DROPOUT = 0.0
+_C.MODEL.HEADS.MLP.DROP_PATH_RATE = 0.0
+_C.MODEL.HEADS.MLP.NORM = "BN1d"
+
 # Classification layer type
 _C.MODEL.HEADS.CLS_LAYER = "Linear"  # ArcSoftmax" or "CircleSoftmax"
 
 # Margin and Scale for margin-based classification layer
 _C.MODEL.HEADS.MARGIN = 0.
 _C.MODEL.HEADS.SCALE = 1
+
+# ---------------------------------------------------------------------------- #
+# S9 branch ablation options
+# ---------------------------------------------------------------------------- #
+_C.MODEL.S9 = CN()
+_C.MODEL.S9.INFERENCE_MODE = "global"
+_C.MODEL.S9.GLOBAL = CN()
+_C.MODEL.S9.GLOBAL.USE_TRIPLET_LOSS = True
+_C.MODEL.S9.DETAIL = CN()
+_C.MODEL.S9.DETAIL.ENABLED = False
+_C.MODEL.S9.DETAIL.LOSS_WEIGHT = 0.3
+_C.MODEL.S9.DETAIL.EMBEDDING_DIM = 256
+_C.MODEL.S9.DETAIL.POOL_LAYER = "GeneralizedMeanPoolingP"
+_C.MODEL.S9.DETAIL.NECK_FEAT = "after"
+_C.MODEL.S9.DETAIL.SHARE_STRIPE_HEADS = False
+_C.MODEL.S9.DETAIL.USE_TRIPLET_LOSS = True
+_C.MODEL.S9.DETAIL.SAGL = CN()
+_C.MODEL.S9.DETAIL.SAGL.ENABLED = False
+_C.MODEL.S9.DETAIL.SAGL.WEIGHT = 1.0
+_C.MODEL.S9.DETAIL.SAGL.MARGIN = 0.6
+_C.MODEL.S9.DETAIL.SAGL.NORMALIZE = True
+_C.MODEL.S9.LKA = CN()
+_C.MODEL.S9.LKA.ENABLED = False
+_C.MODEL.S9.LKA.LOSS_WEIGHT = 0.3
+_C.MODEL.S9.LKA.EMBEDDING_DIM = 256
+_C.MODEL.S9.LKA.POOL_LAYER = "GeneralizedMeanPoolingP"
+_C.MODEL.S9.LKA.NECK_FEAT = "after"
+_C.MODEL.S9.LKA.USE_TRIPLET_LOSS = True
+_C.MODEL.S9.LKA.ALPHA = 0.05
+_C.MODEL.S9.LKA.OUTPUT_MODE = "fixed_residual"
+_C.MODEL.S9.LKA.RESIDUAL_NORM = "none"
+_C.MODEL.S9.LKA.MAX_RAW_NORM_RATIO = 2.0
+_C.MODEL.S9.LKA.NORM_EPS = 1e-6
+
+# ---------------------------------------------------------------------------- #
+# S10 distilled S9B+SaGL options
+# ---------------------------------------------------------------------------- #
+_C.MODEL.S10 = CN()
+_C.MODEL.S10.INFERENCE_MODE = "global"
+_C.MODEL.S10.DETAIL = CN()
+_C.MODEL.S10.DETAIL.LOSS_WEIGHT = 0.3
+_C.MODEL.S10.DETAIL.EMBEDDING_DIM = 256
+_C.MODEL.S10.DETAIL.POOL_LAYER = "GeneralizedMeanPoolingP"
+_C.MODEL.S10.DETAIL.NECK_FEAT = "after"
+_C.MODEL.S10.SAGL = CN()
+_C.MODEL.S10.SAGL.WEIGHT = 2.0
+_C.MODEL.S10.SAGL.MARGIN = 0.6
+_C.MODEL.S10.SAGL.NORMALIZE = True
 
 # ---------------------------------------------------------------------------- #
 # REID LOSSES options
@@ -108,6 +199,15 @@ _C.MODEL.LOSSES.TRI.MARGIN = 0.3
 _C.MODEL.LOSSES.TRI.NORM_FEAT = False
 _C.MODEL.LOSSES.TRI.HARD_MINING = False
 _C.MODEL.LOSSES.TRI.SCALE = 1.0
+
+# Weighted Regularized Triplet Loss options
+_C.MODEL.LOSSES.WRT = CN()
+_C.MODEL.LOSSES.WRT.NORM_FEAT = False
+_C.MODEL.LOSSES.WRT.SCALE = 1.0
+
+# Center Loss options
+_C.MODEL.LOSSES.CENTER = CN()
+_C.MODEL.LOSSES.CENTER.SCALE = 0.0005
 
 # Circle Loss options
 _C.MODEL.LOSSES.CIRCLE = CN()
@@ -213,6 +313,7 @@ _C.DATALOADER.SAMPLER_TRAIN = "TrainingSampler"
 # Number of instance for each person
 _C.DATALOADER.NUM_INSTANCE = 4
 _C.DATALOADER.NUM_WORKERS = 8
+_C.DATALOADER.PIN_MEMORY = True
 
 # For set re-weight
 _C.DATALOADER.SET_WEIGHT = []
@@ -296,6 +397,8 @@ _C.TEST.EVAL_PERIOD = 20
 
 # Number of images per batch across all machines.
 _C.TEST.IMS_PER_BATCH = 64
+_C.TEST.NUM_WORKERS = 4
+_C.TEST.PIN_MEMORY = True
 _C.TEST.METRIC = "cosine"
 _C.TEST.ROC = CN({"ENABLED": False})
 _C.TEST.FLIP = CN({"ENABLED": False})
@@ -321,6 +424,10 @@ _C.TEST.PRECISE_BN.NUM_ITER = 300
 # Misc options
 # ---------------------------------------------------------------------------- #
 _C.OUTPUT_DIR = "logs/"
+
+# Reproducibility seed. Negative values keep the historical behavior of
+# generating a fresh random seed at each launch.
+_C.SEED = -1
 
 # Benchmark different cudnn algorithms.
 # If input images have very different sizes, this option will have large overhead

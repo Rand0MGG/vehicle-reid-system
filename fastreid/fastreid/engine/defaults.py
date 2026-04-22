@@ -108,7 +108,7 @@ def default_setup(cfg, args):
         logger.info("Full config saved to {}".format(os.path.abspath(path)))
 
     # make sure each worker has a different, yet deterministic seed if specified
-    seed_all_rng()
+    seed_all_rng(None if cfg.SEED < 0 else cfg.SEED + comm.get_rank())
 
     # cudnn benchmark has large overhead. It shouldn't be used considering the small size of
     # typical validation set.
@@ -292,6 +292,17 @@ class DefaultTrainer(TrainerBase):
                 self.model,
                 cfg.MODEL.FREEZE_LAYERS,
                 cfg.SOLVER.FREEZE_ITERS,
+            ))
+
+        if (
+                cfg.MODEL.BACKBONE.LKA.ENABLED
+                and cfg.MODEL.BACKBONE.LKA.GAMMA_WARMUP_ENABLED
+        ):
+            ret.append(hooks.LKAGammaWarmup(
+                self.model,
+                cfg.MODEL.BACKBONE.LKA.GAMMA_WARMUP_ITERS,
+                cfg.MODEL.BACKBONE.LKA.GAMMA_WARMUP_START,
+                cfg.MODEL.BACKBONE.LKA.GAMMA_WARMUP_END,
             ))
 
         # Do PreciseBN before checkpointer, because it updates the model and need to

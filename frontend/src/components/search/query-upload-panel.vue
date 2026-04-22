@@ -78,7 +78,7 @@ const handleFileChange = (uploadFile) => {
 <style scoped>
 .query-upload :deep(.el-upload-dragger) {
   min-height: 300px;
-  border-radius: 24px;
+  border-radius: 8px;
 }
 
 .preview-box {
@@ -92,7 +92,7 @@ const handleFileChange = (uploadFile) => {
   height: 100%;
   min-height: 300px;
   object-fit: cover;
-  border-radius: 24px;
+  border-radius: 8px;
 }
 
 .preview-overlay {
@@ -101,7 +101,7 @@ const handleFileChange = (uploadFile) => {
   right: 14px;
   bottom: 14px;
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: 8px;
   background: rgba(20, 20, 19, 0.78);
   color: var(--text-on-dark);
 }

@@ -4,27 +4,27 @@
       <p class="brand-eyebrow">Vehicle ReID Console</p>
       <h1>基于深度卷积神经网络的车辆重识别系统的设计与实现</h1>
       <p class="brand-copy">
-        登录后可以继续完成车辆检索、运行模型切换、图库同步与后台管理。 这一版前端保持现有业务链路，但把视觉和阅读节奏整理成更统一的产品界面。
+        Design and Implementation of a Vehicle Re-identification System Based on Deep Convolutional Neural Networks
       </p>
 
-      <div class="brand-grid">
-        <article class="brand-card">
-          <span class="card-eyebrow">Search</span>
-          <strong>上传一张查询图像</strong>
-          <p>直接返回相似车辆结果，并展示相似度、采集时间和来源信息。</p>
-        </article>
+      <div class="workflow-rail">
+        <div class="workflow-step">
+          <span>01</span>
+          <strong>Image Registry</strong>
+          <p>图库图片先成为可追溯的数据记录。</p>
+        </div>
 
-        <article class="brand-card">
-          <span class="card-eyebrow">Models</span>
-          <strong>由管理员统一切换当前模型</strong>
-          <p>当前模型与图库特征使用的模型会被明确标记，避免模型变化后检索结果失真。</p>
-        </article>
+        <div class="workflow-step">
+          <span>02</span>
+          <strong>Model Profiles</strong>
+          <p>每个模型独立维护自己的特征版本。</p>
+        </div>
 
-        <article class="brand-card">
-          <span class="card-eyebrow">Admin</span>
-          <strong>在同一处完成后台操作</strong>
-          <p>统一查看日志、用户、图库更新、运行监控与系统配置。</p>
-        </article>
+        <div class="workflow-step">
+          <span>03</span>
+          <strong>Retrieval</strong>
+          <p>用户选择模型后完成 Fast 或 Pro 检索。</p>
+        </div>
       </div>
     </section>
 
@@ -146,7 +146,7 @@ const handleLogin = async () => {
 
 .brand-panel {
   padding: 56px 52px;
-  border-radius: 32px;
+  border-radius: 8px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.44), rgba(250, 249, 245, 0.86));
 }
 
@@ -180,33 +180,41 @@ const handleLogin = async () => {
   line-height: 1.65;
 }
 
-.brand-grid {
+.workflow-rail {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
+  max-width: 620px;
   margin-top: 42px;
 }
 
-.brand-card {
-  padding: 22px;
-  border: 1px solid var(--border-soft);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.56);
-  box-shadow: var(--shadow-ring);
+.workflow-step {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 4px;
+  align-items: start;
+  padding: 16px 0;
+  border-top: 1px solid rgba(201, 100, 66, 0.16);
 }
 
-.brand-card strong {
-  display: block;
-  margin-top: 10px;
+.workflow-step span {
+  grid-row: span 2;
+  color: var(--text-accent);
+  font-family: var(--font-number);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.workflow-step strong {
   color: var(--text-primary);
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 500;
   line-height: 1.2;
 }
 
-.brand-card p {
-  margin: 10px 0 0;
+.workflow-step p {
+  margin: 0;
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.6;
@@ -221,7 +229,7 @@ const handleLogin = async () => {
 .panel-shell {
   width: min(100%, 520px);
   padding: 32px;
-  border-radius: 32px;
+  border-radius: 8px;
   background: rgba(250, 249, 245, 0.94);
 }
 
@@ -262,9 +270,6 @@ const handleLogin = async () => {
     grid-template-columns: 1fr;
   }
 
-  .brand-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 720px) {
@@ -276,7 +281,7 @@ const handleLogin = async () => {
   .brand-panel,
   .panel-shell {
     padding: 24px;
-    border-radius: 24px;
+    border-radius: 8px;
   }
 
   .helper-row {

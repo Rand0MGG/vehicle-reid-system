@@ -185,6 +185,8 @@ def build_optimizer(cfg, model, contiguous=False):
         weight_decay_norm=cfg.SOLVER.WEIGHT_DECAY_NORM,
         bias_lr_factor=cfg.SOLVER.BIAS_LR_FACTOR,
         heads_lr_factor=cfg.SOLVER.HEADS_LR_FACTOR,
+        lka_lr_factor=cfg.MODEL.BACKBONE.LKA.LR_FACTOR,
+        lka_freeze_with_backbone=cfg.MODEL.BACKBONE.LKA.FREEZE_WITH_BACKBONE,
         weight_decay_bias=cfg.SOLVER.WEIGHT_DECAY_BIAS,
         freeze_layers=cfg.MODEL.FREEZE_LAYERS if cfg.SOLVER.FREEZE_ITERS > 0 else [],
     )
@@ -215,6 +217,8 @@ def get_default_optimizer_params(
         weight_decay_norm: Optional[float] = None,
         bias_lr_factor: Optional[float] = 1.0,
         heads_lr_factor: Optional[float] = 1.0,
+        lka_lr_factor: Optional[float] = 1.0,
+        lka_freeze_with_backbone: bool = True,
         weight_decay_bias: Optional[float] = None,
         overrides: Optional[Dict[str, Dict[str, float]]] = None,
         freeze_layers: Optional[list] = [],
@@ -229,6 +233,8 @@ def get_default_optimizer_params(
         weight_decay_norm: override weight decay for params in normalization layers
         bias_lr_factor: multiplier of lr for bias parameters.
         heads_lr_factor: multiplier of lr for model.head parameters.
+        lka_lr_factor: multiplier of lr for opt-in LKA parameters.
+        lka_freeze_with_backbone: whether LKA parameters follow backbone freeze rules.
         weight_decay_bias: override weight decay for bias parameters
         overrides: if not `None`, provides values for optimizer hyperparameters
             (LR, weight decay) for module parameters with a given name; e.g.
@@ -281,6 +287,7 @@ def get_default_optimizer_params(
     )
     params: List[Dict[str, Any]] = []
     memo: Set[torch.nn.parameter.Parameter] = set()
+    lka_module_names = {"lka", "lka3", "lka4", "paper_lka"}
 
     for module_name, module in model.named_modules():
         for module_param_name, value in module.named_parameters(recurse=False):
@@ -298,12 +305,17 @@ def get_default_optimizer_params(
             if module_name.split('.')[0] == "heads" and (heads_lr_factor is not None and heads_lr_factor != 1.0):
                 hyperparams["lr"] = hyperparams.get("lr", base_lr) * heads_lr_factor
             name = module_name + '.' + module_param_name
+            is_lka_param = any(part in lka_module_names for part in module_name.split('.'))
+            if is_lka_param and (lka_lr_factor is not None and lka_lr_factor != 1.0):
+                hyperparams["lr"] = hyperparams.get("lr", base_lr) * lka_lr_factor
             freeze_status = "normal"
             # Search freeze layer names, it must match from beginning, so use `match` not `search`
             for pattern in layer_names_pattern:
                 if pattern.match(name) is not None:
                     freeze_status = "freeze"
                     break
+            if is_lka_param and not lka_freeze_with_backbone:
+                freeze_status = "normal"
 
             params.append({"freeze_status": freeze_status, "params": [value], **hyperparams})
     return params

@@ -49,6 +49,12 @@ class Baseline(nn.Module):
         self.heads = heads
 
         self.loss_kwargs = loss_kwargs
+        loss_names = loss_kwargs.get('loss_names', ()) if loss_kwargs else ()
+        if 'CenterLoss' in loss_names:
+            self.center_loss = CenterLoss(
+                loss_kwargs['center']['num_classes'],
+                loss_kwargs['center']['feat_dim'],
+            )
 
         self.register_buffer('pixel_mean', torch.Tensor(pixel_mean).view(1, -1, 1, 1), False)
         self.register_buffer('pixel_std', torch.Tensor(pixel_std).view(1, -1, 1, 1), False)
@@ -57,6 +63,9 @@ class Baseline(nn.Module):
     def from_config(cls, cfg):
         backbone = build_backbone(cfg)
         heads = build_heads(cfg)
+        center_feat_dim = cfg.MODEL.BACKBONE.FEAT_DIM
+        if cfg.MODEL.HEADS.NECK_FEAT == 'after' and cfg.MODEL.HEADS.EMBEDDING_DIM > 0:
+            center_feat_dim = cfg.MODEL.HEADS.EMBEDDING_DIM
         return {
             'backbone': backbone,
             'heads': heads,
@@ -78,6 +87,15 @@ class Baseline(nn.Module):
                         'norm_feat': cfg.MODEL.LOSSES.TRI.NORM_FEAT,
                         'hard_mining': cfg.MODEL.LOSSES.TRI.HARD_MINING,
                         'scale': cfg.MODEL.LOSSES.TRI.SCALE
+                    },
+                    'wrt': {
+                        'norm_feat': cfg.MODEL.LOSSES.WRT.NORM_FEAT,
+                        'scale': cfg.MODEL.LOSSES.WRT.SCALE
+                    },
+                    'center': {
+                        'scale': cfg.MODEL.LOSSES.CENTER.SCALE,
+                        'num_classes': cfg.MODEL.HEADS.NUM_CLASSES,
+                        'feat_dim': center_feat_dim
                     },
                     'circle': {
                         'margin': cfg.MODEL.LOSSES.CIRCLE.MARGIN,
@@ -166,6 +184,21 @@ class Baseline(nn.Module):
                 tri_kwargs.get('norm_feat'),
                 tri_kwargs.get('hard_mining')
             ) * tri_kwargs.get('scale')
+
+        if 'WRTLoss' in loss_names:
+            wrt_kwargs = self.loss_kwargs.get('wrt')
+            loss_dict['loss_wrt'] = wrt_loss(
+                pred_features,
+                gt_labels,
+                wrt_kwargs.get('norm_feat')
+            ) * wrt_kwargs.get('scale')
+
+        if 'CenterLoss' in loss_names:
+            center_kwargs = self.loss_kwargs.get('center')
+            loss_dict['loss_center'] = self.center_loss(
+                pred_features,
+                gt_labels
+            ) * center_kwargs.get('scale')
 
         if 'CircleLoss' in loss_names:
             circle_kwargs = self.loss_kwargs.get('circle')

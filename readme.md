@@ -165,7 +165,7 @@ If the filename does not match the pattern, the backend still ingests the image 
 vehicle-reid-system/
 |-- backend/                 FastAPI entrypoint, API routes, services, DB access, startup migrations
 |-- frontend/                Vue 3 + Vite + Element Plus admin/search UI
-|-- configs/                 ReID configuration files, including vehicle_reid.yml
+|-- configs/                 ReID configuration files, including veri_r50ibn_sbs_s0_v1.yml
 |-- fastreid/                FastReID source integration
 |-- media/                   README screenshots and GitHub presentation assets
 |-- datasets/gallery/        Runtime gallery image folder
@@ -428,7 +428,7 @@ sequenceDiagram
 vehicle-reid-system/
 |-- backend/                 FastAPI 应用、接口、服务、数据库连接、启动迁移
 |-- frontend/                Vue 3 + Vite + Element Plus 前端
-|-- configs/                 ReID 配置文件，包括 vehicle_reid.yml
+|-- configs/                 ReID 配置文件，包括 veri_r50ibn_sbs_s0_v1.yml
 |-- fastreid/                FastReID 源码集成
 |-- media/                   README 截图素材
 |-- datasets/gallery/        运行时底库图片目录

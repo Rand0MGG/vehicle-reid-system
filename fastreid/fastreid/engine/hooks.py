@@ -33,6 +33,7 @@ __all__ = [
     "EvalHook",
     "PreciseBN",
     "LayerFreeze",
+    "LKAGammaWarmup",
 ]
 
 """
@@ -498,6 +499,47 @@ class LayerFreeze(HookBase):
 
         freeze_layers = ", ".join(self.freeze_layers)
         self._logger.info(f'Open layer group "{freeze_layers}" training')
+
+
+class LKAGammaWarmup(HookBase):
+    def __init__(self, model, warmup_iters, start_factor=0.0, end_factor=1.0):
+        self._logger = logging.getLogger(__name__)
+        if isinstance(model, DistributedDataParallel):
+            model = model.module
+        self.model = model
+        self.warmup_iters = int(warmup_iters)
+        self.start_factor = float(start_factor)
+        self.end_factor = float(end_factor)
+        self._module_count = 0
+
+    def before_train(self):
+        self._module_count = sum(
+            1
+            for module in self.model.modules()
+            if hasattr(module, "set_gamma_warmup_factor")
+        )
+        self._logger.info(
+            "LKA gamma warmup enabled for %d module(s): %.6g -> %.6g over %d iterations",
+            self._module_count,
+            self.start_factor,
+            self.end_factor,
+            self.warmup_iters,
+        )
+        self._set_factor(self._factor_at_iter(self.trainer.iter))
+
+    def before_step(self):
+        self._set_factor(self._factor_at_iter(self.trainer.iter))
+
+    def _factor_at_iter(self, iteration):
+        if self.warmup_iters <= 0:
+            return self.end_factor
+        progress = min(max(float(iteration) / float(self.warmup_iters), 0.0), 1.0)
+        return self.start_factor + (self.end_factor - self.start_factor) * progress
+
+    def _set_factor(self, factor):
+        for module in self.model.modules():
+            if hasattr(module, "set_gamma_warmup_factor"):
+                module.set_gamma_warmup_factor(factor)
 
 
 class SWA(HookBase):

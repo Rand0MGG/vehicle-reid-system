@@ -77,12 +77,13 @@ def _train_loader_from_config(cfg, *, train_set=None, transforms=None, sampler=N
         "sampler": sampler,
         "total_batch_size": cfg.SOLVER.IMS_PER_BATCH,
         "num_workers": cfg.DATALOADER.NUM_WORKERS,
+        "pin_memory": cfg.DATALOADER.PIN_MEMORY,
     }
 
 
 @configurable(from_config=_train_loader_from_config)
 def build_reid_train_loader(
-        train_set, *, sampler=None, total_batch_size, num_workers=0,
+        train_set, *, sampler=None, total_batch_size, num_workers=0, pin_memory=True,
 ):
     """
     Build a dataloader for object re-identification with some default features.
@@ -102,7 +103,7 @@ def build_reid_train_loader(
         num_workers=num_workers,
         batch_sampler=batch_sampler,
         collate_fn=fast_batch_collator,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
 
     return train_loader
@@ -127,11 +128,13 @@ def _test_loader_from_config(cfg, *, dataset_name=None, test_set=None, num_query
         "test_set": test_set,
         "test_batch_size": cfg.TEST.IMS_PER_BATCH,
         "num_query": num_query,
+        "num_workers": cfg.TEST.NUM_WORKERS,
+        "pin_memory": cfg.TEST.PIN_MEMORY,
     }
 
 
 @configurable(from_config=_test_loader_from_config)
-def build_reid_test_loader(test_set, test_batch_size, num_query, num_workers=4):
+def build_reid_test_loader(test_set, test_batch_size, num_query, num_workers=4, pin_memory=True):
     """
     Similar to `build_reid_train_loader`. This sampler coordinates all workers to produce
     the exact set of all samples
@@ -163,7 +166,7 @@ def build_reid_test_loader(test_set, test_batch_size, num_query, num_workers=4):
         batch_sampler=batch_sampler,
         num_workers=num_workers,  # save some memory
         collate_fn=fast_batch_collator,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     return test_loader, num_query
 

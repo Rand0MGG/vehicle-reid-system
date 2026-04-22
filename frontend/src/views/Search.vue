@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
   gap: 20px;
   padding: 24px 28px;
   border: 1px solid var(--border-soft);
-  border-radius: 28px;
+  border-radius: 8px;
   background: var(--surface-panel);
   box-shadow: var(--shadow-whisper);
 }
@@ -262,7 +262,7 @@ onBeforeUnmount(() => {
   margin: 18px 0 20px;
   padding: 16px 18px;
   border: 1px solid var(--border-soft);
-  border-radius: 18px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.48);
 }
 

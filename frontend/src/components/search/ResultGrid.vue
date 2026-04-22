@@ -107,7 +107,7 @@ defineProps({
 .result-card {
   overflow: hidden;
   border: 1px solid var(--border-soft);
-  border-radius: 20px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.62);
   box-shadow: var(--shadow-ring);
 }

@@ -1,62 +1,119 @@
-﻿import numpy as np
-from sqlalchemy.orm import Session
+import numpy as np
+from sqlalchemy.orm import Session, joinedload
 
 from app.engine.predictor import reid_engine
-from app.models.vehicle import VehicleFeature
+from app.models.model_profile import ModelRevision
+from app.models.vehicle import GalleryFeature, GalleryImage
+from fastreid.evaluation.rerank import re_ranking
 
 
 class SearchService:
     def __init__(self, db: Session):
         self.db = db
 
-    def search(self, img_path: str, top_k: int = 10, similarity_threshold: float = 0.0):
-        query_feat = self._extract_query_feature(img_path)
-        gallery_data = self._fetch_gallery_data()
+    def search(
+        self,
+        img_path: str,
+        revision: ModelRevision,
+        top_k: int = 10,
+        similarity_threshold: float = 0.0,
+        search_mode: str = "fast",
+        deep_thinking: bool = False,
+    ):
+        normalized_mode = self._normalize_mode(search_mode)
+        reid_engine.configure(profile=revision, eager=reid_engine.initialized)
+        query_feat = self._extract_query_feature(img_path, normalized_mode)
+        gallery_data = self._fetch_gallery_data(revision=revision, search_mode=normalized_mode)
+
+        if gallery_data["matrix"].shape[0] == 0:
+            raise ValueError("该模型还没有可检索的图库特征，请先在后台为该模型构建特征。")
+
         results = self._calculate_similarity(
             query_feat,
             gallery_data,
             similarity_threshold=similarity_threshold,
+            deep_thinking=deep_thinking,
         )
-        return results[:top_k]
+        return {
+            "results": results[:top_k],
+            "feature_dim": int(query_feat.size),
+            "gallery_size": len(gallery_data["meta"]),
+            "deep_thinking_used": bool(deep_thinking and len(gallery_data["meta"]) > 0),
+        }
 
-    def _extract_query_feature(self, img_path):
-        return reid_engine.extract_feature(img_path)
+    def _normalize_mode(self, search_mode: str) -> str:
+        normalized_mode = str(search_mode or "fast").strip().lower()
+        if normalized_mode not in {"fast", "pro"}:
+            raise ValueError("search_mode 只能是 fast 或 pro。")
+        return normalized_mode
 
-    def _fetch_gallery_data(self):
-        records = self.db.query(VehicleFeature).all()
+    def _extract_query_feature(self, img_path: str, search_mode: str) -> np.ndarray:
+        return reid_engine.extract_feature(img_path, search_mode=search_mode)
+
+    def _fetch_gallery_data(self, revision: ModelRevision, search_mode: str):
+        expected_full_dim = int(revision.full_feature_dim)
+        expected_view_dim = int(revision.global_feature_dim if search_mode == "fast" else revision.full_feature_dim)
+        records = (
+            self.db.query(GalleryFeature)
+            .options(
+                joinedload(GalleryFeature.image).joinedload(GalleryImage.vehicle_identity),
+                joinedload(GalleryFeature.image).joinedload(GalleryImage.camera),
+            )
+            .filter(GalleryFeature.model_revision_id == revision.id)
+            .order_by(GalleryFeature.id.asc())
+            .all()
+        )
 
         features = []
         metadata = []
         for row in records:
-            feat_vec = np.frombuffer(row.feature, dtype=np.float32)
-            features.append(feat_vec)
+            full_vec = np.frombuffer(row.feature, dtype=np.float32)
+            if full_vec.size != expected_full_dim:
+                raise ValueError(
+                    f"图库特征维度为 {full_vec.size}，但模型版本期望 {expected_full_dim}。请重新构建该模型的图库特征。"
+                )
+
+            view_vec = full_vec[:expected_view_dim] if search_mode == "fast" else full_vec
+            if view_vec.size != expected_view_dim:
+                raise ValueError("图库特征视图维度与查询模式不一致，请重新构建该模型的图库特征。")
+
+            image = row.image
+            features.append(view_vec.astype(np.float32, copy=False))
             metadata.append(
                 {
-                    "vehicle_id": row.vehicle_id,
-                    "cam_id": row.cam_id,
-                    "capture_time": row.capture_time,
-                    "img_path": row.img_path,
+                    "image_id": image.id,
+                    "vehicle_id": image.vehicle_id,
+                    "cam_id": image.cam_id,
+                    "capture_time": image.capture_time,
+                    "img_path": image.img_path,
                 }
             )
 
-        return {"matrix": np.array(features), "meta": metadata}
+        matrix = np.vstack(features) if features else np.empty((0, expected_view_dim), dtype=np.float32)
+        return {"matrix": matrix, "meta": metadata}
 
-    def _calculate_similarity(self, query_feat, gallery_data, similarity_threshold: float = 0.0):
+    def _calculate_similarity(
+        self,
+        query_feat: np.ndarray,
+        gallery_data,
+        similarity_threshold: float = 0.0,
+        deep_thinking: bool = False,
+    ):
         gallery_matrix = gallery_data["matrix"]
         metadata = gallery_data["meta"]
 
-        if len(gallery_matrix) == 0:
-            return []
+        if gallery_matrix.shape[1] != query_feat.size:
+            raise ValueError(f"查询特征维度 {query_feat.size} 与图库特征维度 {gallery_matrix.shape[1]} 不一致。")
 
-        query_norm = np.linalg.norm(query_feat)
-        if query_norm > 0:
-            query_feat = query_feat / query_norm
-
-        gallery_norm = np.linalg.norm(gallery_matrix, axis=1, keepdims=True)
-        gallery_matrix = gallery_matrix / (gallery_norm + 1e-12)
-
+        query_feat = self._normalize_vector(query_feat)
+        gallery_matrix = self._normalize_matrix(gallery_matrix)
         sim_scores = np.dot(gallery_matrix, query_feat)
+
         sorted_indices = np.argsort(sim_scores)[::-1]
+        rerank_distances = None
+        if deep_thinking:
+            rerank_distances = self._calculate_rerank_distances(query_feat, gallery_matrix)
+            sorted_indices = np.argsort(rerank_distances)
 
         results = []
         for idx in sorted_indices:
@@ -65,15 +122,41 @@ class SearchService:
                 continue
 
             info = metadata[idx]
-            results.append(
-                {
-                    "vehicle_id": info["vehicle_id"],
-                    "cam_id": info["cam_id"],
-                    "capture_time": info["capture_time"],
-                    "img_path": info["img_path"],
-                    "img_url": f"/static/{info['img_path'].lstrip('/')}",
-                    "score": score,
-                }
-            )
+            item = {
+                "image_id": info["image_id"],
+                "vehicle_id": info["vehicle_id"],
+                "cam_id": info["cam_id"],
+                "capture_time": info["capture_time"],
+                "img_path": info["img_path"],
+                "img_url": f"/api/v1/gallery/images/{info['image_id']}/file",
+                "score": score,
+            }
+            if rerank_distances is not None:
+                item["rerank_distance"] = float(rerank_distances[idx])
+            results.append(item)
 
         return results
+
+    def _calculate_rerank_distances(self, query_feat: np.ndarray, gallery_matrix: np.ndarray) -> np.ndarray:
+        query_matrix = query_feat.reshape(1, -1)
+        q_g_dist = np.maximum(0.0, 1.0 - np.dot(query_matrix, gallery_matrix.T)).astype(np.float32)
+        q_q_dist = np.zeros((1, 1), dtype=np.float32)
+        g_g_dist = np.maximum(0.0, 1.0 - np.dot(gallery_matrix, gallery_matrix.T)).astype(np.float32)
+        max_distance = max(
+            float(q_g_dist.max()) if q_g_dist.size else 0.0,
+            float(g_g_dist.max()) if g_g_dist.size else 0.0,
+        )
+        if max_distance == 0.0:
+            q_g_dist = q_g_dist + 1e-12
+            g_g_dist = g_g_dist + 1e-12
+        return re_ranking(q_g_dist, q_q_dist, g_g_dist).reshape(-1)
+
+    def _normalize_vector(self, vector: np.ndarray) -> np.ndarray:
+        norm = np.linalg.norm(vector)
+        if norm <= 0:
+            return vector.astype(np.float32, copy=False)
+        return (vector / norm).astype(np.float32, copy=False)
+
+    def _normalize_matrix(self, matrix: np.ndarray) -> np.ndarray:
+        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+        return (matrix / (norms + 1e-12)).astype(np.float32, copy=False)

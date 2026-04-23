@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -32,6 +33,15 @@ sync_status = {
     "skipped": 0,
     "failed": 0,
     "message": "",
+    "started_at": None,
+    "finished_at": None,
+    "elapsed_seconds": 0.0,
+    "duration_seconds": None,
+    "progress_percent": 0.0,
+    "items_per_second": 0.0,
+    "estimated_remaining_seconds": None,
+    "_started_perf": None,
+    "_finished_perf": None,
 }
 
 
@@ -41,7 +51,73 @@ def append_log(message: str) -> None:
     sync_status["logs"] = sync_status["logs"][-300:]
 
 
+def _round_seconds(value: Optional[float]) -> Optional[float]:
+    if value is None:
+        return None
+    return round(max(0.0, float(value)), 2)
+
+
+def _refresh_progress_metrics() -> None:
+    started_perf = sync_status.get("_started_perf")
+    finished_perf = sync_status.get("_finished_perf")
+    if started_perf is None:
+        sync_status["elapsed_seconds"] = 0.0
+        sync_status["duration_seconds"] = None
+        sync_status["progress_percent"] = 0.0
+        sync_status["items_per_second"] = 0.0
+        sync_status["estimated_remaining_seconds"] = None
+        return
+
+    end_perf = finished_perf if finished_perf is not None else time.perf_counter()
+    elapsed = max(0.0, float(end_perf) - float(started_perf))
+    total = max(0, int(sync_status.get("total") or 0))
+    processed = max(0, int(sync_status.get("processed") or 0))
+    rate = processed / elapsed if elapsed > 0 and processed > 0 else 0.0
+    remaining = None
+    if sync_status.get("is_running") and total > processed and rate > 0:
+        remaining = (total - processed) / rate
+
+    sync_status["elapsed_seconds"] = _round_seconds(elapsed) or 0.0
+    sync_status["duration_seconds"] = _round_seconds(elapsed) if finished_perf is not None else None
+    sync_status["progress_percent"] = round(min(100.0, processed / total * 100), 1) if total > 0 else 0.0
+    sync_status["items_per_second"] = round(rate, 2)
+    sync_status["estimated_remaining_seconds"] = _round_seconds(remaining)
+
+
+def _set_task_counts(
+    *,
+    total: Optional[int] = None,
+    processed: Optional[int] = None,
+    created: Optional[int] = None,
+    skipped: Optional[int] = None,
+    failed: Optional[int] = None,
+    message: Optional[str] = None,
+) -> None:
+    if total is not None:
+        sync_status["total"] = int(total)
+    if processed is not None:
+        sync_status["processed"] = int(processed)
+    if created is not None:
+        sync_status["created"] = int(created)
+    if skipped is not None:
+        sync_status["skipped"] = int(skipped)
+    if failed is not None:
+        sync_status["failed"] = int(failed)
+    if message is not None:
+        sync_status["message"] = message
+    _refresh_progress_metrics()
+
+
+def get_gallery_status_snapshot() -> dict:
+    _refresh_progress_metrics()
+    snapshot = dict(sync_status)
+    snapshot.pop("_started_perf", None)
+    snapshot.pop("_finished_perf", None)
+    return snapshot
+
+
 def start_gallery_operation(task_type: str, message: str) -> None:
+    now = datetime.now()
     sync_status.update(
         {
             "is_running": True,
@@ -56,15 +132,27 @@ def start_gallery_operation(task_type: str, message: str) -> None:
             "skipped": 0,
             "failed": 0,
             "message": message,
+            "started_at": now.isoformat(timespec="seconds"),
+            "finished_at": None,
+            "elapsed_seconds": 0.0,
+            "duration_seconds": None,
+            "progress_percent": 0.0,
+            "items_per_second": 0.0,
+            "estimated_remaining_seconds": None,
+            "_started_perf": time.perf_counter(),
+            "_finished_perf": None,
         }
     )
     append_log(message)
 
 
 def finish_gallery_operation(message: str) -> None:
-    sync_status["message"] = message
-    append_log(message)
     sync_status["is_running"] = False
+    sync_status["message"] = message
+    sync_status["finished_at"] = datetime.now().isoformat(timespec="seconds")
+    sync_status["_finished_perf"] = time.perf_counter()
+    _refresh_progress_metrics()
+    append_log(message)
 
 
 def parse_filename(filename: str) -> dict:
@@ -198,9 +286,9 @@ def _register_paths_with_status(paths: list[str], *, actor_user_id: Optional[int
     skipped = 0
     errors = []
     total = len(paths)
-    sync_status["total"] = total
-    sync_status["message"] = f"准备注册 {total} 张图片。"
-    append_log(sync_status["message"])
+    message = f"准备注册 {total} 张图片。"
+    _set_task_counts(total=total, processed=0, created=0, skipped=0, failed=0, message=message)
+    append_log(message)
 
     try:
         for index, path_value in enumerate(paths, start=1):
@@ -215,14 +303,17 @@ def _register_paths_with_status(paths: list[str], *, actor_user_id: Optional[int
                 db.rollback()
                 errors.append({"path": path_value, "message": str(exc)})
 
-            sync_status["processed"] = index
-            sync_status["created"] = created
-            sync_status["skipped"] = skipped
-            sync_status["failed"] = len(errors)
-            sync_status["message"] = f"已处理 {index}/{total}，新增 {created}，跳过 {skipped}，失败 {len(errors)}。"
+            message = f"已处理 {index}/{total}，新增 {created}，跳过 {skipped}，失败 {len(errors)}。"
+            _set_task_counts(
+                processed=index,
+                created=created,
+                skipped=skipped,
+                failed=len(errors),
+                message=message,
+            )
 
-            if index == total or index % 50 == 0 or errors and len(errors) <= 5:
-                append_log(sync_status["message"])
+            if index == total or index % 50 == 0 or (errors and len(errors) <= 5):
+                append_log(message)
 
         return {"created": created, "skipped": skipped, "errors": errors}
     finally:
@@ -348,6 +439,17 @@ def create_build_task(db: Session, revision: ModelRevision, *, actor_user_id: Op
     return task
 
 
+def _sync_feature_progress_from_task(task: FeatureBuildTask) -> None:
+    _set_task_counts(
+        total=task.total_images,
+        processed=task.processed_images,
+        created=task.success_count,
+        skipped=0,
+        failed=task.failed_count,
+        message=task.message or "",
+    )
+
+
 def run_feature_build_task(
     task_id: int,
     actor_user_id: Optional[int] = None,
@@ -362,7 +464,7 @@ def run_feature_build_task(
     try:
         task = db.query(FeatureBuildTask).filter(FeatureBuildTask.id == task_id).first()
         if not task:
-            append_log("任务记录不存在。")
+            finish_gallery_operation("任务记录不存在。")
             return
 
         revision = db.query(ModelRevision).filter(ModelRevision.id == task.model_revision_id).first()
@@ -387,12 +489,12 @@ def run_feature_build_task(
             db.commit()
             append_log(f"已清空该模型版本旧特征 {removed} 条。")
 
-        query = (
+        images = (
             db.query(GalleryImage)
             .options(joinedload(GalleryImage.features))
             .order_by(GalleryImage.id.asc())
+            .all()
         )
-        images = query.all()
         existing_image_ids = {
             item[0]
             for item in db.query(GalleryFeature.image_id)
@@ -401,13 +503,17 @@ def run_feature_build_task(
         }
         pending_images = [image for image in images if image.id not in existing_image_ids]
         task.total_images = len(pending_images)
+        task.processed_images = 0
+        task.success_count = 0
+        task.failed_count = 0
+        task.message = f"待处理图片 {len(pending_images)} 张"
         db.commit()
-        append_log(f"待处理图片 {len(pending_images)} 张。")
+        _sync_feature_progress_from_task(task)
+        append_log(task.message)
 
         search_mode = "pro" if revision.supports_concat else "fast"
         expected_dim = int(revision.full_feature_dim)
         for image in pending_images:
-            task.processed_images += 1
             try:
                 vector = reid_engine.extract_feature(image.img_path, search_mode=search_mode)
                 if vector.size != expected_dim:
@@ -420,25 +526,33 @@ def run_feature_build_task(
                         feature=vector.astype("float32", copy=False).tobytes(),
                     )
                 )
+                task.processed_images += 1
                 task.success_count += 1
                 task.message = f"已处理 {task.processed_images}/{task.total_images}"
-                append_log(f"已完成 [{task.processed_images}/{task.total_images}] {Path(image.img_path).name}")
                 db.commit()
+                _sync_feature_progress_from_task(task)
+                append_log(f"已完成 [{task.processed_images}/{task.total_images}] {Path(image.img_path).name}")
             except Exception as exc:
                 db.rollback()
                 task = db.query(FeatureBuildTask).filter(FeatureBuildTask.id == task_id).first()
                 task.processed_images += 1
                 task.failed_count += 1
                 task.message = f"{Path(image.img_path).name}: {exc}"
-                append_log(f"失败：{Path(image.img_path).name}，{exc}")
                 db.commit()
+                _sync_feature_progress_from_task(task)
+                append_log(f"失败：{Path(image.img_path).name}，{exc}")
 
         task.status = "succeeded" if task.failed_count == 0 else "failed"
         task.finished_at = datetime.now()
         task.message = f"完成：成功 {task.success_count}，失败 {task.failed_count}"
         db.commit()
-        append_log(task.message)
-        execute_audit_insertion(actor_user_id, f"构建模型图库特征：成功 {task.success_count}，失败 {task.failed_count}", task.failed_count == 0)
+        _sync_feature_progress_from_task(task)
+        finish_gallery_operation(task.message)
+        execute_audit_insertion(
+            actor_user_id,
+            f"构建模型图库特征：成功 {task.success_count}，失败 {task.failed_count}",
+            task.failed_count == 0,
+        )
     except Exception as exc:
         db.rollback()
         logger.exception("Feature build task failed")
@@ -448,10 +562,12 @@ def run_feature_build_task(
             task.finished_at = datetime.now()
             task.message = str(exc)
             db.commit()
-        append_log(f"图库特征构建被异常中断：{exc}")
+            _sync_feature_progress_from_task(task)
+        finish_gallery_operation(f"图库特征构建被异常中断：{exc}")
         execute_audit_insertion(actor_user_id, "构建模型图库特征失败", False)
     finally:
-        sync_status["is_running"] = False
+        if sync_status["is_running"]:
+            finish_gallery_operation(sync_status.get("message") or "任务结束。")
         db.close()
 
 

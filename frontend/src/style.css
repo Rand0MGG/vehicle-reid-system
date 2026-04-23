@@ -1,9 +1,9 @@
 ﻿:root {
   --page-bg: #f5f4ed;
   --page-bg-soft: #faf9f5;
-  --surface-card: rgba(250, 249, 245, 0.92);
-  --surface-panel: rgba(250, 249, 245, 0.96);
-  --surface-strong: #ffffff;
+  --surface-card: rgba(250, 249, 245, 0.74);
+  --surface-panel: rgba(250, 249, 245, 0.78);
+  --surface-strong: rgba(255, 255, 255, 0.76);
   --surface-dark: #30302e;
   --surface-dark-border: #3b3a38;
   --text-primary: #141413;
@@ -25,6 +25,9 @@
   --focus-warm: #c96442;
   --shadow-ring: 0 0 0 1px rgba(209, 207, 197, 0.72);
   --shadow-whisper: rgba(0, 0, 0, 0.05) 0 4px 24px;
+  --glass-border: rgba(255, 250, 244, 0.58);
+  --glass-highlight: rgba(255, 255, 255, 0.42);
+  --glass-blur: blur(18px) saturate(1.16);
   --font-serif: Georgia, "Songti SC", "STSong", "Times New Roman", serif;
   --font-sans: "PingFang SC", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
@@ -59,6 +62,8 @@
   --el-text-color-secondary: #87867f;
   --el-mask-color: rgba(20, 20, 19, 0.42);
   --el-font-family: var(--font-sans);
+  --mouse-x: 50vw;
+  --mouse-y: 12vh;
 }
 
 html,
@@ -85,6 +90,24 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(201, 100, 66, 0.86) rgba(255, 255, 255, 0.58);
   font-variant-numeric: tabular-nums;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 620px at var(--mouse-x) var(--mouse-y), rgba(217, 119, 87, 0.26), rgba(201, 100, 66, 0.11) 34%, transparent 70%),
+    radial-gradient(circle 420px at calc(var(--mouse-x) + 180px) calc(var(--mouse-y) + 110px), rgba(255, 250, 244, 0.32), transparent 68%);
+  mix-blend-mode: multiply;
+  opacity: 0.92;
+  transition: opacity 0.2s ease;
+}
+
+body.detail-overlay-lock {
+  overflow: hidden;
 }
 
 #app {
@@ -154,7 +177,8 @@ select {
   padding: 10px 14px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.64);
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: var(--glass-blur);
   color: var(--text-secondary);
   font-size: 13px;
 }
@@ -258,6 +282,7 @@ select {
   border: 1px solid var(--border-soft);
   background: var(--surface-card);
   box-shadow: var(--shadow-whisper);
+  backdrop-filter: var(--glass-blur);
 }
 
 .el-input__wrapper,
@@ -265,13 +290,15 @@ select {
 .el-textarea__inner,
 .el-date-editor.el-input__wrapper,
 .el-input-number {
-  background: rgba(255, 255, 255, 0.84) !important;
+  background: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(12px) saturate(1.12);
   box-shadow: inset 0 0 0 1px #e3dfd2 !important;
 }
 
 .el-upload-dragger {
   border: 1px dashed #d6d0c3 !important;
-  background: rgba(255, 255, 255, 0.52) !important;
+  background: rgba(255, 255, 255, 0.38) !important;
+  backdrop-filter: blur(14px) saturate(1.12);
 }
 
 .el-upload-dragger:hover {
@@ -351,5 +378,12 @@ select {
   .app-page {
     width: min(calc(100% - 20px), var(--page-max-width));
     padding: 16px 0 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mouse-x: 50vw;
+    --mouse-y: 12vh;
   }
 }

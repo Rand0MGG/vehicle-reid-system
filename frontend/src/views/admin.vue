@@ -141,7 +141,7 @@
             </div>
 
             <div class="top-gap">
-              <TerminalLogPanel title="图库任务日志" :logs="logs" :is-running="isRunning" />
+              <TerminalLogPanel title="图库任务日志" :logs="logs" :is-running="isRunning" :status="galleryTaskStatus" />
             </div>
 
             <div class="stats-grid compact-grid">
@@ -230,7 +230,7 @@
             </div>
 
             <div class="top-gap">
-              <TerminalLogPanel title="模型特征构建日志" :logs="logs" :is-running="isRunning" />
+              <TerminalLogPanel title="模型特征构建日志" :logs="logs" :is-running="isRunning" :status="galleryTaskStatus" />
             </div>
           </SectionCard>
 
@@ -523,7 +523,7 @@ import {
 
 const router = useRouter()
 const { syncSession, logoutAndRedirect } = useSession(router)
-const { isRunning, logs, refreshStatus, startPolling, setPollInterval } = useGalleryPolling()
+const { status: galleryTaskStatus, isRunning, logs, refreshStatus, startPolling, setPollInterval } = useGalleryPolling()
 
 const menuItems = [
   { key: 'settings', index: '01', label: '系统设置', description: '设备、阈值与浏览范围' },
@@ -1107,8 +1107,9 @@ watch(isRunning, async (running, wasRunning) => {
   padding: 18px;
   border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.54);
+  background: rgba(255, 255, 255, 0.40);
   box-shadow: var(--shadow-ring);
+  backdrop-filter: blur(14px) saturate(1.12);
 }
 
 .soft-panel h3,
@@ -1144,14 +1145,15 @@ watch(isRunning, async (running, wasRunning) => {
   padding: 16px;
   border: 1px solid rgba(171, 96, 67, 0.22);
   border-radius: 8px;
-  background: rgba(255, 250, 244, 0.76);
+  background: rgba(255, 250, 244, 0.52);
   box-shadow: 0 14px 34px rgba(91, 55, 38, 0.08);
+  backdrop-filter: blur(14px) saturate(1.12);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .model-profile-card:hover {
   border-color: rgba(201, 100, 66, 0.34);
-  background: rgba(255, 250, 244, 0.9);
+  background: rgba(255, 250, 244, 0.68);
   box-shadow: 0 18px 40px rgba(91, 55, 38, 0.12), 0 0 0 4px rgba(201, 100, 66, 0.06);
 }
 

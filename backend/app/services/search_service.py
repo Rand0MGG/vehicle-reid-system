@@ -1,4 +1,9 @@
+import time
+from datetime import datetime
+from typing import Optional
+
 import numpy as np
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.engine.predictor import reid_engine
@@ -21,14 +26,38 @@ class SearchService:
         deep_thinking: bool = False,
         deep_thinking_candidate_limit_min: int = 100,
         deep_thinking_candidate_limit_max: int = 500,
+        max_deep_thinking_gallery_size: int = 5000,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
     ):
+        total_started = time.perf_counter()
         normalized_mode = self._normalize_mode(search_mode)
         reid_engine.configure(profile=revision, eager=reid_engine.initialized)
+
+        extract_started = time.perf_counter()
         query_feat = self._extract_query_feature(img_path, normalized_mode)
-        gallery_data = self._fetch_gallery_data(revision=revision, search_mode=normalized_mode)
+        extract_seconds = time.perf_counter() - extract_started
+
+        load_started = time.perf_counter()
+        gallery_data = self._fetch_gallery_data(
+            revision=revision,
+            search_mode=normalized_mode,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        load_gallery_seconds = time.perf_counter() - load_started
+        time_filter_used = start_time is not None or end_time is not None
 
         if gallery_data["matrix"].shape[0] == 0:
+            if time_filter_used:
+                raise ValueError("该时间范围内没有可检索的图库特征。")
             raise ValueError("该模型还没有可检索的图库特征，请先在后台为该模型构建特征。")
+
+        if deep_thinking and gallery_data["matrix"].shape[0] > int(max_deep_thinking_gallery_size):
+            raise ValueError(
+                f"深度思考最多支持 {int(max_deep_thinking_gallery_size)} 张候选图库图片，"
+                f"当前筛选后有 {gallery_data['matrix'].shape[0]} 张。"
+            )
 
         results = self._calculate_similarity(
             query_feat,
@@ -39,12 +68,25 @@ class SearchService:
             deep_thinking_candidate_limit_min=deep_thinking_candidate_limit_min,
             deep_thinking_candidate_limit_max=deep_thinking_candidate_limit_max,
         )
+        deep_thinking_used = bool(deep_thinking and results["rerank_candidate_count"] > 0)
+        timings = {
+            "feature_extract_seconds": round(extract_seconds, 4),
+            "load_gallery_seconds": round(load_gallery_seconds, 4),
+            "similarity_seconds": round(results["timings"].get("similarity_seconds", 0.0), 4),
+            "rerank_seconds": round(results["timings"].get("rerank_seconds", 0.0), 4),
+            "total_seconds": round(time.perf_counter() - total_started, 4),
+        }
+
         return {
             "results": results["items"][:top_k],
             "feature_dim": int(query_feat.size),
-            "gallery_size": len(gallery_data["meta"]),
+            "gallery_size": int(gallery_data["total_count"]),
+            "filtered_gallery_size": len(gallery_data["meta"]),
             "rerank_candidate_count": int(results["rerank_candidate_count"]),
-            "deep_thinking_used": bool(deep_thinking and results["rerank_candidate_count"] > 0),
+            "deep_thinking_used": deep_thinking_used,
+            "sort_basis": "rerank_distance" if deep_thinking_used else "similarity",
+            "time_filter_used": time_filter_used,
+            "timings": timings,
         }
 
     def _normalize_mode(self, search_mode: str) -> str:
@@ -56,19 +98,39 @@ class SearchService:
     def _extract_query_feature(self, img_path: str, search_mode: str) -> np.ndarray:
         return reid_engine.extract_feature(img_path, search_mode=search_mode)
 
-    def _fetch_gallery_data(self, revision: ModelRevision, search_mode: str):
+    def _fetch_gallery_data(
+        self,
+        revision: ModelRevision,
+        search_mode: str,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+    ):
         expected_full_dim = int(revision.full_feature_dim)
         expected_view_dim = int(revision.global_feature_dim if search_mode == "fast" else revision.full_feature_dim)
-        records = (
+        total_count = (
+            self.db.query(func.count(GalleryFeature.id))
+            .filter(GalleryFeature.model_revision_id == revision.id)
+            .scalar()
+            or 0
+        )
+
+        query = (
             self.db.query(GalleryFeature)
+            .join(GalleryImage, GalleryFeature.image_id == GalleryImage.id)
             .options(
                 joinedload(GalleryFeature.image).joinedload(GalleryImage.vehicle_identity),
                 joinedload(GalleryFeature.image).joinedload(GalleryImage.camera),
             )
             .filter(GalleryFeature.model_revision_id == revision.id)
-            .order_by(GalleryFeature.id.asc())
-            .all()
         )
+        if start_time is not None or end_time is not None:
+            query = query.filter(GalleryImage.capture_time.isnot(None))
+        if start_time is not None:
+            query = query.filter(GalleryImage.capture_time >= start_time)
+        if end_time is not None:
+            query = query.filter(GalleryImage.capture_time <= end_time)
+
+        records = query.order_by(GalleryFeature.id.asc()).all()
 
         features = []
         metadata = []
@@ -96,7 +158,7 @@ class SearchService:
             )
 
         matrix = np.vstack(features) if features else np.empty((0, expected_view_dim), dtype=np.float32)
-        return {"matrix": matrix, "meta": metadata}
+        return {"matrix": matrix, "meta": metadata, "total_count": int(total_count)}
 
     def _calculate_similarity(
         self,
@@ -110,18 +172,22 @@ class SearchService:
     ):
         gallery_matrix = gallery_data["matrix"]
         metadata = gallery_data["meta"]
+        timings = {"similarity_seconds": 0.0, "rerank_seconds": 0.0}
 
         if gallery_matrix.shape[1] != query_feat.size:
             raise ValueError(f"查询特征维度 {query_feat.size} 与图库特征维度 {gallery_matrix.shape[1]} 不一致。")
 
+        similarity_started = time.perf_counter()
         query_feat = self._normalize_vector(query_feat)
         gallery_matrix = self._normalize_matrix(gallery_matrix)
         sim_scores = np.dot(gallery_matrix, query_feat)
-
         sorted_indices = np.argsort(sim_scores)[::-1]
+        timings["similarity_seconds"] = time.perf_counter() - similarity_started
+
         rerank_distances = None
         rerank_candidate_count = 0
         if deep_thinking:
+            rerank_started = time.perf_counter()
             rerank_candidate_count = self._resolve_rerank_candidate_count(
                 gallery_size=gallery_matrix.shape[0],
                 top_k=top_k,
@@ -134,6 +200,7 @@ class SearchService:
             rerank_distances = np.full(gallery_matrix.shape[0], np.nan, dtype=np.float32)
             rerank_distances[candidate_indices] = candidate_distances
             sorted_indices = candidate_indices[np.argsort(candidate_distances)]
+            timings["rerank_seconds"] = time.perf_counter() - rerank_started
 
         results = []
         for idx in sorted_indices:
@@ -155,7 +222,7 @@ class SearchService:
                 item["rerank_distance"] = float(rerank_distances[idx])
             results.append(item)
 
-        return {"items": results, "rerank_candidate_count": rerank_candidate_count}
+        return {"items": results, "rerank_candidate_count": rerank_candidate_count, "timings": timings}
 
     def _resolve_rerank_candidate_count(self, gallery_size: int, top_k: int, min_limit: int, max_limit: int) -> int:
         gallery_size = max(0, int(gallery_size))

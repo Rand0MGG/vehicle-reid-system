@@ -4,7 +4,12 @@ export function formatDateTime(value) {
   }
 
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().replace('T', ' ').slice(0, 19)
+    const pad = (input) => String(input).padStart(2, '0')
+    return [
+      value.getFullYear(),
+      pad(value.getMonth() + 1),
+      pad(value.getDate())
+    ].join('-') + ` ${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`
   }
 
   if (typeof value === 'string') {

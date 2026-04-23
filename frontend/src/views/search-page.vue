@@ -121,7 +121,7 @@
                 range-separator="至"
                 start-placeholder="开始时间"
                 end-placeholder="结束时间"
-                disabled
+                value-format="YYYY-MM-DD HH:mm:ss"
               />
             </el-form-item>
           </el-form>
@@ -129,9 +129,7 @@
           <div class="helper-note">
             <strong>{{ searched ? '本次检索' : '当前可用能力' }}</strong>
             <p>
-              {{ searched
-                ? `模式 ${searchMeta.searchMode.toUpperCase()}，特征 ${searchMeta.featureDim || '--'} 维，深度思考${searchMeta.deepThinkingUsed ? `已启用，候选 ${searchMeta.rerankCandidateCount || 0} / 图库 ${searchMeta.gallerySize || 0}` : '未启用'}。`
-                : capabilityText }}
+              {{ searched ? searchSummaryText : capabilityText }}
             </p>
           </div>
 
@@ -205,6 +203,18 @@ const capabilityText = computed(() => {
     return '请选择一个管理员发布的模型。'
   }
   return `Fast 使用 ${selectedModel.value.global_feature_dim} 维，Pro 使用 ${selectedModel.value.full_feature_dim} 维。`
+})
+const searchSummaryText = computed(() => {
+  const mode = (searchMeta.value.searchMode || 'fast').toUpperCase()
+  const featureDim = searchMeta.value.featureDim || '--'
+  const filtered = searchMeta.value.filteredGallerySize || searchMeta.value.gallerySize || 0
+  const total = searchMeta.value.gallerySize || 0
+  const sortText = searchMeta.value.sortBasis === 'rerank_distance' ? '重排距离从低到高' : '相似度从高到低'
+  const deepText = searchMeta.value.deepThinkingUsed
+    ? `深度思考已启用，候选 ${searchMeta.value.rerankCandidateCount || 0} / ${filtered}`
+    : '深度思考未启用'
+  const filterText = searchMeta.value.timeFilterUsed ? `，时间过滤后图库 ${filtered} / ${total}` : ''
+  return `模式 ${mode}，特征 ${featureDim} 维，排序依据：${sortText}，${deepText}${filterText}。`
 })
 const queryAccept = computed(() => allowedQuerySuffixes.value.length ? allowedQuerySuffixes.value.join(',') : 'image/*')
 const uploadHelperMessage = computed(() => {
@@ -294,6 +304,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: var(--surface-panel);
   box-shadow: var(--shadow-whisper);
+  backdrop-filter: var(--glass-blur);
 }
 
 .search-copy h1 {
@@ -432,11 +443,12 @@ onBeforeUnmount(() => {
   padding: 10px 14px;
   border: 1px solid rgba(171, 96, 67, 0.22);
   border-radius: 8px;
-  background: rgba(255, 250, 244, 0.68);
+  background: rgba(255, 250, 244, 0.52);
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
   box-shadow: var(--shadow-ring);
+  backdrop-filter: blur(14px) saturate(1.12);
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -507,8 +519,9 @@ onBeforeUnmount(() => {
   padding: 16px 18px;
   border: 1px solid rgba(171, 96, 67, 0.2);
   border-radius: 8px;
-  background: rgba(255, 250, 244, 0.68);
+  background: rgba(255, 250, 244, 0.48);
   box-shadow: 0 12px 28px rgba(91, 55, 38, 0.08);
+  backdrop-filter: blur(14px) saturate(1.12);
 }
 
 .helper-note strong {

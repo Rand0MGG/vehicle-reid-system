@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="terminal-shell" :class="{ running: isRunning }">
     <div class="terminal-top">
       <div class="lights">
@@ -7,6 +7,27 @@
         <span class="light green"></span>
       </div>
       <span>{{ title }}</span>
+    </div>
+
+    <div v-if="hasProgress" class="task-progress">
+      <div class="task-progress-main">
+        <div>
+          <strong>{{ status.message || (isRunning ? '任务运行中' : '最近任务') }}</strong>
+          <p>{{ status.processed || 0 }} / {{ status.total || 0 }} · 新增/成功 {{ status.created || 0 }} · 跳过 {{ status.skipped || 0 }} · 失败 {{ status.failed || 0 }}</p>
+        </div>
+        <span>{{ normalizedProgress.toFixed(1) }}%</span>
+      </div>
+
+      <div class="progress-track" :class="{ running: isRunning }">
+        <span :style="{ width: `${normalizedProgress}%` }"></span>
+      </div>
+
+      <div class="task-metrics">
+        <span>耗时 {{ formatDuration(status.elapsed_seconds) }}</span>
+        <span v-if="status.duration_seconds !== null && status.duration_seconds !== undefined">总用时 {{ formatDuration(status.duration_seconds) }}</span>
+        <span v-if="isRunning && status.estimated_remaining_seconds !== null && status.estimated_remaining_seconds !== undefined">预计剩余 {{ formatDuration(status.estimated_remaining_seconds) }}</span>
+        <span>速度 {{ formatRate(status.items_per_second) }}</span>
+      </div>
     </div>
 
     <div ref="bodyRef" class="terminal-body">
@@ -24,7 +45,8 @@
 </template>
 
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { formatDuration } from '@/utils/formatters'
 
 const props = defineProps({
   title: {
@@ -38,10 +60,31 @@ const props = defineProps({
   isRunning: {
     type: Boolean,
     default: false
+  },
+  status: {
+    type: Object,
+    default: () => ({})
   }
 })
 
 const bodyRef = ref(null)
+const hasProgress = computed(() => Number(props.status?.total || 0) > 0 || props.isRunning)
+const normalizedProgress = computed(() => {
+  const progress = Number(props.status?.progress_percent ?? 0)
+  if (Number.isFinite(progress)) {
+    return Math.max(0, Math.min(100, progress))
+  }
+  const total = Number(props.status?.total || 0)
+  const processed = Number(props.status?.processed || 0)
+  return total > 0 ? Math.max(0, Math.min(100, processed / total * 100)) : 0
+})
+
+const formatRate = (value) => {
+  const rate = Number(value)
+  if (!Number.isFinite(rate) || rate <= 0) return '-- 项/秒'
+  if (rate < 10) return `${rate.toFixed(2)} 项/秒`
+  return `${rate.toFixed(1)} 项/秒`
+}
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -118,6 +161,68 @@ defineExpose({
   background: #648f60;
 }
 
+.task-progress {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  border-bottom: 1px solid var(--surface-dark-border);
+  background: rgba(255, 250, 244, 0.06);
+}
+
+.task-progress-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.task-progress-main strong {
+  color: var(--text-on-dark);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.task-progress-main p,
+.task-metrics {
+  margin: 4px 0 0;
+  color: var(--text-on-dark-muted);
+  font-family: var(--font-number);
+  font-size: 12px;
+}
+
+.task-progress-main > span {
+  color: #f0b29a;
+  font-family: var(--font-number);
+  font-weight: 700;
+}
+
+.progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 250, 244, 0.12);
+}
+
+.progress-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d97757, #f0b29a, #c96442);
+  background-size: 180% 100%;
+  transition: width 0.28s ease;
+}
+
+.progress-track.running span {
+  animation: progress-shimmer 1.35s linear infinite;
+}
+
+.task-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .terminal-body {
   height: 420px;
   overflow: auto;
@@ -161,10 +266,24 @@ defineExpose({
   }
 }
 
+@keyframes progress-shimmer {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .terminal-line.latest,
-  .terminal-shell.running .terminal-top {
+  .terminal-shell.running .terminal-top,
+  .progress-track.running span {
     animation: none;
+  }
+
+  .progress-track span {
+    transition: none;
   }
 }
 </style>

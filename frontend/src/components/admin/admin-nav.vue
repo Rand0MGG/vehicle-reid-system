@@ -39,6 +39,7 @@ defineEmits(['select'])
   border-radius: 8px;
   background: var(--surface-card);
   box-shadow: var(--shadow-whisper);
+  backdrop-filter: var(--glass-blur);
 }
 
 .nav-item {
@@ -74,7 +75,8 @@ defineEmits(['select'])
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(12px) saturate(1.12);
   color: var(--text-accent);
   font-size: 12px;
   font-weight: 700;

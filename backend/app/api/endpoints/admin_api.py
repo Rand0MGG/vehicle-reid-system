@@ -25,6 +25,7 @@ from app.services.gallery_service import (
     clear_features_for_revision,
     create_build_task,
     delete_gallery_image,
+    get_gallery_status_snapshot,
     get_revision_feature_status,
     list_gallery_images,
     run_feature_build_task,
@@ -692,7 +693,7 @@ def open_native_file_dialog(payload: NativeDialogPayload, current_user: User = D
 @router.get("/gallery/status")
 def get_gallery_status(current_user: User = Depends(require_admin_user)):
     _ = current_user
-    return _success(dict(sync_status))
+    return _success(get_gallery_status_snapshot())
 
 
 @router.post("/gallery/clear")

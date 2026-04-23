@@ -3,6 +3,7 @@ import os
 import shutil
 import tempfile
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -36,6 +37,28 @@ def _get_safe_suffix(filename: Optional[str], allowed_suffixes: set[str]) -> str
             detail=f"当前仅支持这些查询图片格式：{', '.join(sorted(allowed_suffixes))}",
         )
     return suffix
+
+
+def _parse_optional_datetime(value: Optional[str], field_name: str) -> Optional[datetime]:
+    if value is None or str(value).strip() == "":
+        return None
+
+    raw = str(value).strip()
+    normalized = raw.replace("/", "-")
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} 时间格式不正确，请使用 YYYY-MM-DD HH:mm:ss。",
+        ) from exc
+
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
 
 
 def _get_public_profile_or_404(db: Session, profile_id: int) -> ModelProfile:
@@ -93,6 +116,8 @@ async def search_vehicle(
     model_profile_id: int = Form(...),
     search_mode: str = Form("fast"),
     deep_thinking: bool = Form(False),
+    start_time: Optional[str] = Form(None),
+    end_time: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     audit_logger: Callable = Depends(get_audit_logger),
     current_user: User = Depends(get_current_user),
@@ -111,6 +136,10 @@ async def search_vehicle(
             suffix.lower()
             for suffix in runtime_config.get("allowed_query_suffixes", DEFAULT_ALLOWED_QUERY_SUFFIXES)
         }
+        filter_start_time = _parse_optional_datetime(start_time, "开始")
+        filter_end_time = _parse_optional_datetime(end_time, "结束")
+        if filter_start_time and filter_end_time and filter_end_time < filter_start_time:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="结束时间不能早于开始时间。")
 
         if normalized_search_mode not in {"fast", "pro"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="search_mode 只能是 fast 或 pro。")
@@ -134,7 +163,7 @@ async def search_vehicle(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该模型图库特征尚未构建完整，请先由管理员补齐特征。")
 
         max_deep_thinking_gallery_size = int(runtime_config.get("max_deep_thinking_gallery_size", 5000))
-        if deep_thinking and gallery_feature_count > max_deep_thinking_gallery_size:
+        if deep_thinking and not (filter_start_time or filter_end_time) and gallery_feature_count > max_deep_thinking_gallery_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"深度思考最多支持 {max_deep_thinking_gallery_size} 张图库图片，当前该模型有 {gallery_feature_count} 张。",
@@ -149,9 +178,11 @@ async def search_vehicle(
             dir=upload_dir,
         )
 
-        start_time = time.time()
+        request_started = time.perf_counter()
+        upload_started = time.perf_counter()
         with os.fdopen(fd, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        upload_seconds = time.perf_counter() - upload_started
 
         service = SearchService(db)
         search_result = service.search(
@@ -163,9 +194,17 @@ async def search_vehicle(
             deep_thinking=bool(deep_thinking),
             deep_thinking_candidate_limit_min=int(runtime_config.get("deep_thinking_candidate_limit_min", 100)),
             deep_thinking_candidate_limit_max=int(runtime_config.get("deep_thinking_candidate_limit_max", 500)),
+            max_deep_thinking_gallery_size=max_deep_thinking_gallery_size,
+            start_time=filter_start_time,
+            end_time=filter_end_time,
         )
         results = search_result["results"]
-        cost_time = time.time() - start_time
+        cost_time = time.perf_counter() - request_started
+        timings = {
+            **search_result.get("timings", {}),
+            "upload_seconds": round(upload_seconds, 4),
+            "total_seconds": round(cost_time, 4),
+        }
 
         audit_logger(
             user_id=current_user.id,
@@ -183,7 +222,15 @@ async def search_vehicle(
                 "search_mode": normalized_search_mode,
                 "feature_dim": search_result["feature_dim"],
                 "gallery_size": search_result["gallery_size"],
+                "filtered_gallery_size": search_result["filtered_gallery_size"],
                 "rerank_candidate_count": search_result["rerank_candidate_count"],
+                "sort_basis": search_result["sort_basis"],
+                "time_filter_used": search_result["time_filter_used"],
+                "time_filter": {
+                    "start_time": filter_start_time,
+                    "end_time": filter_end_time,
+                },
+                "timings": timings,
                 "deep_thinking_requested": bool(deep_thinking),
                 "deep_thinking_used": bool(search_result["deep_thinking_used"]),
             }

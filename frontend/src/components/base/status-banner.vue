@@ -29,7 +29,8 @@ defineProps({
   padding: 14px 16px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(14px) saturate(1.14);
 }
 
 .tone-info {

@@ -46,6 +46,7 @@ defineProps({
   border-radius: 8px;
   background: var(--surface-panel);
   box-shadow: var(--shadow-whisper);
+  backdrop-filter: var(--glass-blur);
 }
 
 .page-copy {

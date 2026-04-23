@@ -67,6 +67,7 @@ const showHeader = computed(() => {
   border-radius: 8px;
   background: var(--surface-card);
   box-shadow: var(--shadow-whisper);
+  backdrop-filter: var(--glass-blur);
   animation: section-enter 0.22s ease both;
 }
 
@@ -76,7 +77,7 @@ const showHeader = computed(() => {
 }
 
 .tone-muted {
-  background: rgba(255, 255, 255, 0.56);
+  background: rgba(255, 255, 255, 0.42);
 }
 
 .tone-contrast {

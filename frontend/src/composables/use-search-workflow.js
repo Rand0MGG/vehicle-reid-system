@@ -1,6 +1,6 @@
-﻿import { ref } from 'vue'
+import { ref } from 'vue'
 import { searchVehicle } from '@/api/search'
-import { normalizeSearchResults } from '@/utils/formatters'
+import { formatDateTime, normalizeSearchResults } from '@/utils/formatters'
 
 function describeSupportedFormats(allowedQuerySuffixes) {
   if (!Array.isArray(allowedQuerySuffixes) || allowedQuerySuffixes.length === 0) {
@@ -8,6 +8,28 @@ function describeSupportedFormats(allowedQuerySuffixes) {
   }
 
   return `当前支持这些图片格式：${allowedQuerySuffixes.join(', ')}。`
+}
+
+function createDefaultSearchMeta(searchMode = 'fast', deepThinking = false) {
+  return {
+    searchMode,
+    featureDim: 0,
+    gallerySize: 0,
+    filteredGallerySize: 0,
+    rerankCandidateCount: 0,
+    deepThinkingRequested: deepThinking,
+    deepThinkingUsed: false,
+    sortBasis: 'similarity',
+    timeFilterUsed: false,
+    timeFilter: null,
+    timings: {}
+  }
+}
+
+function toDateTimePayload(value) {
+  if (!value) return ''
+  if (value instanceof Date) return formatDateTime(value)
+  return String(value).replace('T', ' ').slice(0, 19)
 }
 
 export function useSearchWorkflow() {
@@ -19,14 +41,7 @@ export function useSearchWorkflow() {
   const selectedModelId = ref(0)
   const searchMode = ref('fast')
   const deepThinking = ref(false)
-  const searchMeta = ref({
-    searchMode: 'fast',
-    featureDim: 0,
-    gallerySize: 0,
-    rerankCandidateCount: 0,
-    deepThinkingRequested: false,
-    deepThinkingUsed: false
-  })
+  const searchMeta = ref(createDefaultSearchMeta())
   const dateRange = ref([])
   const file = ref(null)
   const previewUrl = ref('')
@@ -53,14 +68,7 @@ export function useSearchWorkflow() {
     results.value = []
     timeCost.value = 0
     searched.value = false
-    searchMeta.value = {
-      searchMode: searchMode.value,
-      featureDim: 0,
-      gallerySize: 0,
-      rerankCandidateCount: 0,
-      deepThinkingRequested: deepThinking.value,
-      deepThinkingUsed: false
-    }
+    searchMeta.value = createDefaultSearchMeta(searchMode.value, deepThinking.value)
   }
 
   const handleFileChange = (uploadFile) => {
@@ -136,8 +144,16 @@ export function useSearchWorkflow() {
       formData.append('search_mode', searchMode.value)
       formData.append('deep_thinking', deepThinking.value ? 'true' : 'false')
 
+      const [rangeStart, rangeEnd] = Array.isArray(dateRange.value) ? dateRange.value : []
+      const startPayload = toDateTimePayload(rangeStart)
+      const endPayload = toDateTimePayload(rangeEnd)
+      if (startPayload) formData.append('start_time', startPayload)
+      if (endPayload) formData.append('end_time', endPayload)
+
       const response = await searchVehicle(formData, { deepThinking: deepThinking.value })
       const normalizedResults = normalizeSearchResults(response.data?.results)
+      const sortBasis = response.data?.sort_basis || 'similarity'
+      const timings = response.data?.timings && typeof response.data.timings === 'object' ? response.data.timings : {}
 
       results.value = normalizedResults
       timeCost.value = Number(response.data?.time_cost) || 0
@@ -145,9 +161,14 @@ export function useSearchWorkflow() {
         searchMode: response.data?.search_mode || searchMode.value,
         featureDim: Number(response.data?.feature_dim ?? 0),
         gallerySize: Number(response.data?.gallery_size ?? 0),
+        filteredGallerySize: Number(response.data?.filtered_gallery_size ?? response.data?.gallery_size ?? 0),
         rerankCandidateCount: Number(response.data?.rerank_candidate_count ?? 0),
         deepThinkingRequested: Boolean(response.data?.deep_thinking_requested),
-        deepThinkingUsed: Boolean(response.data?.deep_thinking_used)
+        deepThinkingUsed: Boolean(response.data?.deep_thinking_used),
+        sortBasis,
+        timeFilterUsed: Boolean(response.data?.time_filter_used),
+        timeFilter: response.data?.time_filter || (startPayload || endPayload ? { start_time: startPayload, end_time: endPayload } : null),
+        timings
       }
       searched.value = true
 
@@ -156,7 +177,7 @@ export function useSearchWorkflow() {
           'success',
           '检索已完成',
           response.data?.deep_thinking_used
-            ? `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果，深度思考重排了 ${response.data?.rerank_candidate_count ?? 0} 个候选。`
+            ? `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果，深度思考按重排距离整理了 ${response.data?.rerank_candidate_count ?? 0} 个候选。`
             : `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果。`
         )
       } else {
@@ -169,10 +190,11 @@ export function useSearchWorkflow() {
       timeCost.value = 0
       searched.value = true
       const isTimeout = /timeout|exceeded/i.test(error?.message || '')
+      const detail = error?.response?.data?.detail || error?.response?.data?.message
       setFeedback(
         'danger',
         isTimeout ? '检索超时' : '检索失败',
-        isTimeout ? '深度思考计算时间过长，请减少返回数量或调低候选上限后再试。' : '请求没有成功完成，请确认后端服务、模型和图库状态。'
+        detail || (isTimeout ? '深度思考计算时间过长，请减少返回数量或调低候选上限后再试。' : '请求没有成功完成，请确认后端服务、模型和图库状态。')
       )
       throw error
     } finally {

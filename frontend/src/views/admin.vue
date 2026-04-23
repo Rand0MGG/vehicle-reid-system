@@ -503,6 +503,7 @@ import {
   fetchModelState,
   fetchSystemConfig,
   fetchUsers,
+  openNativeFileDialog,
   publishModelProfile,
   registerGalleryFiles,
   registerGalleryFolder,
@@ -904,8 +905,28 @@ const handleDeleteImage = async (image) => {
 const openFileBrowser = async (kind, target) => {
   browserKind.value = kind
   browserTarget.value = target
-  showFileBrowser.value = true
-  await browsePath('')
+  try {
+    const response = await openNativeFileDialog(kind)
+    const data = response.data || {}
+    if (!data.selected) return
+
+    const values = Array.isArray(data.values) ? data.values : []
+    const firstValue = data.value || values[0] || ''
+    if (target === 'weights') profileForm.weights_file = firstValue
+    if (target === 'config') profileForm.config_file = firstValue
+    if (target === 'galleryFolder') galleryFolderPath.value = firstValue
+    if (target === 'galleryFiles') {
+      const current = parseLines(galleryFilePathsText.value)
+      values.forEach((value) => {
+        if (value && !current.includes(value)) current.push(value)
+      })
+      galleryFilePathsText.value = current.join('\n')
+    }
+  } catch {
+    ElMessage.warning('系统文件选择窗口不可用，已切换为备用浏览器。')
+    showFileBrowser.value = true
+    await browsePath('')
+  }
 }
 
 const browsePath = async (path) => {
@@ -1162,9 +1183,36 @@ watch(isRunning, async (running, wasRunning) => {
 }
 
 .profile-advanced {
-  border: 1px solid rgba(171, 96, 67, 0.2);
+  overflow: hidden;
+  border: 1px solid rgba(171, 96, 67, 0.18);
+  border-top: 1px solid rgba(171, 96, 67, 0.18);
+  border-bottom: 1px solid rgba(171, 96, 67, 0.18);
   border-radius: 8px;
-  background: rgba(255, 250, 244, 0.6);
+  background: rgba(255, 250, 244, 0.68);
+  box-shadow: var(--shadow-ring);
+}
+
+.profile-advanced :deep(.el-collapse-item__header) {
+  height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(232, 225, 212, 0.9);
+  background: rgba(255, 250, 244, 0.78);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.profile-advanced :deep(.el-collapse-item__wrap) {
+  border-bottom: 0;
+  background: transparent;
+}
+
+.profile-advanced :deep(.el-collapse-item__content) {
+  padding: 16px 14px 14px;
+  color: var(--text-primary);
+}
+
+.profile-advanced :deep(.el-collapse) {
+  border: 0;
 }
 
 .input-with-action,

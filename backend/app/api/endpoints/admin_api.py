@@ -132,6 +132,10 @@ class RegisterFolderPayload(BaseModel):
     recursive: bool = True
 
 
+class NativeDialogPayload(BaseModel):
+    kind: str = "image"
+
+
 def _success(data=None, message: str = "success"):
     return success_response(data=data, message=message)
 
@@ -338,6 +342,43 @@ def _browser_value(path: Path, kind: str) -> str:
     if kind == "config":
         return path.relative_to(REPO_ROOT).as_posix()
     return str(path)
+
+
+def _ensure_selected_paths_allowed(paths: list[Path], kind: str, roots: list[Path]) -> None:
+    for path in paths:
+        if not any(str(path).lower() == str(root).lower() or _is_relative_to(path, root) for root in roots):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"选择的路径不在允许范围内：{path}")
+
+
+def _open_native_dialog(kind: str, roots: list[Path]) -> list[Path]:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="当前运行环境无法打开系统文件选择窗口。") from exc
+
+    initial_dir = str(roots[0]) if roots else str(REPO_ROOT)
+    suffixes = {
+        "weights": [("PyTorch weights", "*.pth *.pt"), ("All files", "*.*")],
+        "config": [("YAML config", "*.yml *.yaml"), ("All files", "*.*")],
+        "image": [("Image files", "*.jpg *.jpeg *.png *.bmp *.webp"), ("All files", "*.*")],
+    }
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        if kind == "folder":
+            selected = filedialog.askdirectory(parent=root, initialdir=initial_dir, title="选择图库目录")
+            return [Path(selected).expanduser().resolve()] if selected else []
+        if kind == "image":
+            selected = filedialog.askopenfilenames(parent=root, initialdir=initial_dir, title="选择图库图片", filetypes=suffixes["image"])
+            return [Path(item).expanduser().resolve() for item in selected]
+        title = "选择权重文件" if kind == "weights" else "选择推理配置文件"
+        selected = filedialog.askopenfilename(parent=root, initialdir=initial_dir, title=title, filetypes=suffixes.get(kind, [("All files", "*.*")]))
+        return [Path(selected).expanduser().resolve()] if selected else []
+    finally:
+        root.destroy()
 
 
 @router.get("/models")
@@ -614,6 +655,32 @@ def browse_files(
             entries.append({"name": item.name, "path": str(item), "value": _browser_value(item.resolve(), normalized_kind), "type": "file", "selectable": normalized_kind != "folder"})
 
     return _success({"path": str(current_path), "roots": [str(root) for root in roots], "entries": entries})
+
+
+@router.post("/native-file-dialog")
+def open_native_file_dialog(payload: NativeDialogPayload, current_user: User = Depends(require_admin_user)):
+    _ = current_user
+    normalized_kind = str(payload.kind or "image").lower()
+    if normalized_kind not in {"weights", "config", "image", "folder"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的文件选择类型。")
+
+    roots = _resolve_browser_roots(normalized_kind)
+    selected_paths = _open_native_dialog(normalized_kind, roots)
+    if not selected_paths:
+        return _success({"selected": False, "kind": normalized_kind, "paths": [], "values": []})
+
+    _ensure_selected_paths_allowed(selected_paths, normalized_kind, roots)
+    values = [_browser_value(path, normalized_kind) for path in selected_paths]
+    return _success(
+        {
+            "selected": True,
+            "kind": normalized_kind,
+            "path": str(selected_paths[0]),
+            "paths": [str(path) for path in selected_paths],
+            "value": values[0],
+            "values": values,
+        }
+    )
 
 
 @router.get("/gallery/status")

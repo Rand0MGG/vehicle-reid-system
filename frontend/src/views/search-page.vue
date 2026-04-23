@@ -67,30 +67,46 @@
 
           <el-form label-position="top" class="parameter-form">
             <el-form-item label="检索模式">
-              <el-radio-group v-model="searchMode" class="mode-segment">
-                <el-radio-button label="fast">Fast</el-radio-button>
+              <div class="mode-segment" :class="{ 'is-pro': searchMode === 'pro', 'pro-disabled': proDisabled }">
+                <button type="button" class="mode-option" :class="{ active: searchMode === 'fast' }" @click="setSearchMode('fast')">
+                  Fast
+                </button>
                 <el-tooltip :disabled="!proDisabled" content="当前模型不支持 Pro 检索" placement="top">
-                  <span>
-                    <el-radio-button label="pro" :disabled="proDisabled">Pro</el-radio-button>
+                  <span class="mode-tooltip-wrap">
+                    <button
+                      type="button"
+                      class="mode-option"
+                      :class="{ active: searchMode === 'pro' }"
+                      :disabled="proDisabled"
+                      @click="setSearchMode('pro')"
+                    >
+                      Pro
+                    </button>
                   </span>
                 </el-tooltip>
-              </el-radio-group>
+              </div>
             </el-form-item>
 
             <el-form-item label="深度思考">
-              <div class="deep-thinking-row">
-                <el-tooltip :disabled="!deepThinkingDisabled" :content="deepThinkingDisabledReason" placement="top">
-                  <span>
-                    <el-switch
-                      v-model="deepThinking"
-                      :disabled="deepThinkingDisabled"
-                      active-text="开启"
-                      inactive-text="关闭"
-                    />
-                  </span>
-                </el-tooltip>
-                <p>开启后只在当前特征矩阵上重新排序，不重新读取图片，也不重写数据库。</p>
-              </div>
+              <el-tooltip :disabled="!deepThinkingDisabled" :content="deepThinkingDisabledReason" placement="top">
+                <span class="deep-thinking-wrap">
+                  <button
+                    type="button"
+                    class="deep-thinking-card"
+                    :class="{ active: deepThinking, disabled: deepThinkingDisabled }"
+                    :disabled="deepThinkingDisabled"
+                    @click="toggleDeepThinking"
+                  >
+                    <span class="thinking-track" aria-hidden="true">
+                      <span class="thinking-knob"></span>
+                    </span>
+                    <span class="thinking-copy">
+                      <strong>{{ deepThinking ? '深度思考已开启' : '深度思考关闭' }}</strong>
+                      <em>只重新排序当前特征矩阵，不重新读取图片，不重写数据库。</em>
+                    </span>
+                  </button>
+                </span>
+              </el-tooltip>
             </el-form-item>
 
             <el-form-item label="返回结果数量">
@@ -210,6 +226,16 @@ const handleModelChange = () => {
   applySelectedModelDefaults()
 }
 
+const setSearchMode = (mode) => {
+  if (mode === 'pro' && proDisabled.value) return
+  searchMode.value = mode
+}
+
+const toggleDeepThinking = () => {
+  if (deepThinkingDisabled.value) return
+  deepThinking.value = !deepThinking.value
+}
+
 const loadPublicModels = async () => {
   modelError.value = ''
   try {
@@ -325,37 +351,154 @@ onBeforeUnmount(() => {
 }
 
 .mode-segment {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(76px, 1fr));
+  gap: 0;
+  min-width: 176px;
+  height: 46px;
   padding: 4px;
   border: 1px solid rgba(171, 96, 67, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 250, 244, 0.84);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.78), 0 0 0 4px rgba(171, 96, 67, 0.08);
+  overflow: hidden;
+}
+
+.mode-segment::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #bf6b4c 0%, #a75f42 100%);
+  box-shadow: 0 8px 18px rgba(124, 73, 47, 0.20);
+  transform: translateX(0);
+  transition: transform 0.24s ease;
+}
+
+.mode-segment.is-pro::before {
+  transform: translateX(100%);
+}
+
+.mode-option {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-strong-soft);
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.mode-option.active {
+  color: #fffaf5;
+}
+
+.mode-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.mode-tooltip-wrap {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.deep-thinking-wrap {
+  display: block;
+  max-width: 100%;
+}
+
+.deep-thinking-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 520px);
+  min-height: 62px;
+  padding: 10px 14px;
+  border: 1px solid rgba(171, 96, 67, 0.22);
   border-radius: 8px;
-  background: rgba(255, 250, 244, 0.78);
+  background: rgba(255, 250, 244, 0.68);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-ring);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.deep-thinking-card:hover:not(.disabled) {
+  border-color: rgba(201, 100, 66, 0.42);
+  background: rgba(255, 250, 244, 0.92);
   box-shadow: 0 0 0 4px rgba(171, 96, 67, 0.08);
 }
 
-.mode-segment :deep(.el-radio-button__inner) {
-  border-radius: 6px;
-  border: 0;
-  font-weight: 700;
+.deep-thinking-card.disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
-.mode-segment :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background: #a75f42;
-  border-color: #a75f42;
-  box-shadow: none;
+.thinking-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 30px;
+  border-radius: 999px;
+  background: #e9e4d9;
+  box-shadow: inset 0 0 0 1px rgba(142, 133, 119, 0.24);
+  transition: background 0.2s ease;
 }
 
-.deep-thinking-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
+.thinking-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fffaf5;
+  box-shadow: 0 4px 10px rgba(78, 64, 48, 0.18);
+  transition: transform 0.22s ease;
 }
 
-.deep-thinking-row p {
+.deep-thinking-card.active .thinking-track {
+  background: linear-gradient(180deg, #bf6b4c 0%, #a75f42 100%);
+}
+
+.deep-thinking-card.active .thinking-knob {
+  transform: translateX(24px);
+}
+
+.thinking-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.thinking-copy strong {
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.thinking-copy em {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  font-style: normal;
+  line-height: 1.45;
 }
 
 .helper-note {

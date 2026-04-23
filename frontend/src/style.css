@@ -169,11 +169,25 @@ select {
   padding: 0 18px;
   font-weight: 500;
   border-radius: 8px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  transition: box-shadow 0.2s ease, filter 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .el-button:hover {
-  transform: translateY(-1px);
+  transform: none;
+}
+
+.el-button--small {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 13px;
+  line-height: 30px;
+}
+
+.el-table .el-button--small {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 12px;
+  line-height: 28px;
 }
 
 .el-button--primary {

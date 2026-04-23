@@ -80,6 +80,10 @@ export function browseServerFiles(params) {
   return request({ url: '/admin/file-browser', method: 'get', params })
 }
 
+export function openNativeFileDialog(kind) {
+  return request({ url: '/admin/native-file-dialog', method: 'post', data: { kind }, timeout: 0 })
+}
+
 export function fetchUsers() {
   return request({ url: '/admin/users', method: 'get' })
 }

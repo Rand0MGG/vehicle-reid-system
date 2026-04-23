@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="terminal-shell">
+  <div class="terminal-shell" :class="{ running: isRunning }">
     <div class="terminal-top">
       <div class="lights">
         <span class="light red"></span>
@@ -14,7 +14,7 @@
         等待新的处理日志输出。
       </div>
 
-      <div v-for="(log, index) in logs" :key="`${index}-${log}`" class="terminal-line">
+      <div v-for="(log, index) in logs" :key="`${index}-${log}`" class="terminal-line" :class="{ latest: index === logs.length - 1 }">
         {{ log }}
       </div>
 
@@ -72,6 +72,10 @@ defineExpose({
   background: var(--surface-dark);
 }
 
+.terminal-shell.running {
+  box-shadow: 0 0 0 1px rgba(201, 100, 66, 0.28), 0 12px 30px rgba(20, 20, 19, 0.16);
+}
+
 .terminal-top {
   display: flex;
   align-items: center;
@@ -81,6 +85,14 @@ defineExpose({
   background: #242320;
   color: var(--text-on-dark-muted);
   font-size: 13px;
+}
+
+.terminal-shell.running .terminal-top {
+  background:
+    linear-gradient(90deg, rgba(201, 100, 66, 0.18), transparent 34%, rgba(201, 100, 66, 0.18) 68%, transparent),
+    #242320;
+  background-size: 180% 100%;
+  animation: terminal-flow 1.6s linear infinite;
 }
 
 .lights {
@@ -123,5 +135,36 @@ defineExpose({
 .terminal-placeholder,
 .terminal-cursor {
   color: var(--text-on-dark-muted);
+}
+
+.terminal-line.latest {
+  animation: log-flash 0.72s ease both;
+}
+
+@keyframes log-flash {
+  0% {
+    color: #fffaf5;
+    text-shadow: 0 0 12px rgba(217, 119, 87, 0.5);
+  }
+  100% {
+    color: var(--text-on-dark);
+    text-shadow: none;
+  }
+}
+
+@keyframes terminal-flow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-line.latest,
+  .terminal-shell.running .terminal-top {
+    animation: none;
+  }
 }
 </style>

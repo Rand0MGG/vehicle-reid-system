@@ -15,6 +15,8 @@ DEFAULT_SYSTEM_CONFIG = {
     "max_results": 50,
     "search_default_top_k": 10,
     "max_deep_thinking_gallery_size": 5000,
+    "deep_thinking_candidate_limit_min": 100,
+    "deep_thinking_candidate_limit_max": 500,
     "gallery_poll_interval_ms": 1500,
     "allowed_query_suffixes": list(DEFAULT_ALLOWED_QUERY_SUFFIXES),
     "file_browser_roots": [
@@ -105,6 +107,14 @@ def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str,
     if isinstance(max_deep_thinking_gallery_size, (int, float)):
         normalized["max_deep_thinking_gallery_size"] = max(1, int(max_deep_thinking_gallery_size))
 
+    deep_thinking_candidate_limit_min = data.get("deep_thinking_candidate_limit_min")
+    if isinstance(deep_thinking_candidate_limit_min, (int, float)):
+        normalized["deep_thinking_candidate_limit_min"] = max(1, int(deep_thinking_candidate_limit_min))
+
+    deep_thinking_candidate_limit_max = data.get("deep_thinking_candidate_limit_max")
+    if isinstance(deep_thinking_candidate_limit_max, (int, float)):
+        normalized["deep_thinking_candidate_limit_max"] = max(1, int(deep_thinking_candidate_limit_max))
+
     gallery_poll_interval_ms = data.get("gallery_poll_interval_ms")
     if isinstance(gallery_poll_interval_ms, (int, float)):
         normalized["gallery_poll_interval_ms"] = max(500, int(gallery_poll_interval_ms))
@@ -121,6 +131,10 @@ def _normalize_system_config(data: Optional[Dict[str, Any]] = None) -> Dict[str,
     normalized["search_default_top_k"] = min(
         normalized["search_default_top_k"],
         normalized["max_results"],
+    )
+    normalized["deep_thinking_candidate_limit_max"] = max(
+        normalized["deep_thinking_candidate_limit_min"],
+        normalized["deep_thinking_candidate_limit_max"],
     )
 
     return normalized

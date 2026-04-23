@@ -22,6 +22,8 @@ export function useSearchWorkflow() {
   const searchMeta = ref({
     searchMode: 'fast',
     featureDim: 0,
+    gallerySize: 0,
+    rerankCandidateCount: 0,
     deepThinkingRequested: false,
     deepThinkingUsed: false
   })
@@ -54,6 +56,8 @@ export function useSearchWorkflow() {
     searchMeta.value = {
       searchMode: searchMode.value,
       featureDim: 0,
+      gallerySize: 0,
+      rerankCandidateCount: 0,
       deepThinkingRequested: deepThinking.value,
       deepThinkingUsed: false
     }
@@ -132,7 +136,7 @@ export function useSearchWorkflow() {
       formData.append('search_mode', searchMode.value)
       formData.append('deep_thinking', deepThinking.value ? 'true' : 'false')
 
-      const response = await searchVehicle(formData)
+      const response = await searchVehicle(formData, { deepThinking: deepThinking.value })
       const normalizedResults = normalizeSearchResults(response.data?.results)
 
       results.value = normalizedResults
@@ -140,6 +144,8 @@ export function useSearchWorkflow() {
       searchMeta.value = {
         searchMode: response.data?.search_mode || searchMode.value,
         featureDim: Number(response.data?.feature_dim ?? 0),
+        gallerySize: Number(response.data?.gallery_size ?? 0),
+        rerankCandidateCount: Number(response.data?.rerank_candidate_count ?? 0),
         deepThinkingRequested: Boolean(response.data?.deep_thinking_requested),
         deepThinkingUsed: Boolean(response.data?.deep_thinking_used)
       }
@@ -149,7 +155,9 @@ export function useSearchWorkflow() {
         setFeedback(
           'success',
           '检索已完成',
-          `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果。`
+          response.data?.deep_thinking_used
+            ? `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果，深度思考重排了 ${response.data?.rerank_candidate_count ?? 0} 个候选。`
+            : `共返回 ${response.data?.total_found ?? normalizedResults.length} 条结果。`
         )
       } else {
         setFeedback('warning', '没有找到匹配结果', '可以尝试更换更清晰的查询图像，或者适当提高返回结果数量。')
@@ -160,7 +168,12 @@ export function useSearchWorkflow() {
       results.value = []
       timeCost.value = 0
       searched.value = true
-      setFeedback('danger', '检索失败', '请求没有成功完成，请确认后端服务、模型和图库状态。')
+      const isTimeout = /timeout|exceeded/i.test(error?.message || '')
+      setFeedback(
+        'danger',
+        isTimeout ? '检索超时' : '检索失败',
+        isTimeout ? '深度思考计算时间过长，请减少返回数量或调低候选上限后再试。' : '请求没有成功完成，请确认后端服务、模型和图库状态。'
+      )
       throw error
     } finally {
       loading.value = false

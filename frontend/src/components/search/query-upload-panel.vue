@@ -13,7 +13,7 @@
       :show-file-list="false"
       :on-change="handleFileChange"
     >
-      <div v-if="previewUrl" class="preview-box">
+      <div v-if="previewUrl" class="preview-box" :class="{ scanning }">
         <img :src="previewUrl" alt="query preview" class="preview-image" />
         <div class="preview-overlay">
           <span>当前查询图像</span>
@@ -65,6 +65,10 @@ defineProps({
   previewUrl: {
     type: String,
     default: ''
+  },
+  scanning: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -85,6 +89,8 @@ const handleFileChange = (uploadFile) => {
   position: relative;
   min-height: 300px;
   width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .preview-image {
@@ -93,6 +99,21 @@ const handleFileChange = (uploadFile) => {
   min-height: 300px;
   object-fit: cover;
   border-radius: 8px;
+}
+
+.preview-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 250, 244, 0.54) 48%, transparent 56%);
+  opacity: 0;
+  transform: translateY(-105%);
+}
+
+.preview-box.scanning::after {
+  opacity: 1;
+  animation: query-scan 1.35s ease-in-out infinite;
 }
 
 .preview-overlay {
@@ -180,6 +201,22 @@ const handleFileChange = (uploadFile) => {
   .upload-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@keyframes query-scan {
+  0% {
+    transform: translateY(-105%);
+  }
+  100% {
+    transform: translateY(105%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview-box.scanning::after {
+    animation: none;
+    opacity: 0;
   }
 }
 </style>

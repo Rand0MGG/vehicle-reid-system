@@ -66,6 +66,8 @@ def fetch_public_models(
             "items": [serialize_profile(profile) for profile in profiles],
             "max_results": int(config.get("max_results", 50)),
             "search_default_top_k": int(config.get("search_default_top_k", 10)),
+            "deep_thinking_candidate_limit_min": int(config.get("deep_thinking_candidate_limit_min", 100)),
+            "deep_thinking_candidate_limit_max": int(config.get("deep_thinking_candidate_limit_max", 500)),
             "allowed_query_suffixes": config.get("allowed_query_suffixes", list(DEFAULT_ALLOWED_QUERY_SUFFIXES)),
         }
     )
@@ -159,6 +161,8 @@ async def search_vehicle(
             similarity_threshold=float(runtime_config.get("similarity_threshold", 0.0)),
             search_mode=normalized_search_mode,
             deep_thinking=bool(deep_thinking),
+            deep_thinking_candidate_limit_min=int(runtime_config.get("deep_thinking_candidate_limit_min", 100)),
+            deep_thinking_candidate_limit_max=int(runtime_config.get("deep_thinking_candidate_limit_max", 500)),
         )
         results = search_result["results"]
         cost_time = time.time() - start_time
@@ -178,6 +182,8 @@ async def search_vehicle(
                 "model_revision_id": revision.id,
                 "search_mode": normalized_search_mode,
                 "feature_dim": search_result["feature_dim"],
+                "gallery_size": search_result["gallery_size"],
+                "rerank_candidate_count": search_result["rerank_candidate_count"],
                 "deep_thinking_requested": bool(deep_thinking),
                 "deep_thinking_used": bool(search_result["deep_thinking_used"]),
             }

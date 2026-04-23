@@ -67,6 +67,7 @@ const showHeader = computed(() => {
   border-radius: 8px;
   background: var(--surface-card);
   box-shadow: var(--shadow-whisper);
+  animation: section-enter 0.22s ease both;
 }
 
 .section-card.compact {
@@ -155,6 +156,23 @@ const showHeader = computed(() => {
   .section-actions {
     align-items: flex-start;
     justify-content: flex-start;
+  }
+}
+
+@keyframes section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-card {
+    animation: none;
   }
 }
 </style>

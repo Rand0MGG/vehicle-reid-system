@@ -63,6 +63,15 @@
                 <el-form-item label="深度思考图库上限">
                   <el-input-number v-model="sysConfig.max_deep_thinking_gallery_size" :min="1" :max="50000" />
                 </el-form-item>
+                <el-form-item label="深度思考候选下限">
+                  <el-input-number v-model="sysConfig.deep_thinking_candidate_limit_min" :min="1" :max="sysConfig.deep_thinking_candidate_limit_max" />
+                </el-form-item>
+              </div>
+
+              <div class="settings-inline-grid">
+                <el-form-item label="深度思考候选上限">
+                  <el-input-number v-model="sysConfig.deep_thinking_candidate_limit_max" :min="sysConfig.deep_thinking_candidate_limit_min" :max="5000" />
+                </el-form-item>
                 <el-form-item label="图库任务轮询间隔 (ms)">
                   <el-input-number v-model="sysConfig.gallery_poll_interval_ms" :min="500" :max="60000" :step="100" />
                 </el-form-item>
@@ -571,6 +580,8 @@ const sysConfig = reactive({
   max_results: 50,
   search_default_top_k: 10,
   max_deep_thinking_gallery_size: 5000,
+  deep_thinking_candidate_limit_min: 100,
+  deep_thinking_candidate_limit_max: 500,
   gallery_poll_interval_ms: 1500,
   allowed_query_suffixes_text: '.jpg, .jpeg, .png, .bmp, .webp',
   file_browser_roots_text: '',
@@ -629,6 +640,8 @@ const loadConfig = async () => {
       max_results: Number(response.data?.max_results ?? 50),
       search_default_top_k: Number(response.data?.search_default_top_k ?? 10),
       max_deep_thinking_gallery_size: Number(response.data?.max_deep_thinking_gallery_size ?? 5000),
+      deep_thinking_candidate_limit_min: Number(response.data?.deep_thinking_candidate_limit_min ?? 100),
+      deep_thinking_candidate_limit_max: Number(response.data?.deep_thinking_candidate_limit_max ?? 500),
       gallery_poll_interval_ms: Number(response.data?.gallery_poll_interval_ms ?? 1500),
       allowed_query_suffixes_text: Array.isArray(response.data?.allowed_query_suffixes) ? response.data.allowed_query_suffixes.join(', ') : '.jpg, .jpeg, .png, .bmp, .webp',
       file_browser_roots_text: Array.isArray(response.data?.file_browser_roots) ? response.data.file_browser_roots.join('\n') : '',
@@ -649,6 +662,8 @@ const handleSaveConfig = async () => {
       max_results: Number(sysConfig.max_results),
       search_default_top_k: Number(sysConfig.search_default_top_k),
       max_deep_thinking_gallery_size: Number(sysConfig.max_deep_thinking_gallery_size),
+      deep_thinking_candidate_limit_min: Number(sysConfig.deep_thinking_candidate_limit_min),
+      deep_thinking_candidate_limit_max: Number(sysConfig.deep_thinking_candidate_limit_max),
       gallery_poll_interval_ms: Number(sysConfig.gallery_poll_interval_ms),
       allowed_query_suffixes: parseCommaList(sysConfig.allowed_query_suffixes_text, ['.jpg', '.jpeg', '.png', '.bmp', '.webp']),
       file_browser_roots: parseLines(sysConfig.file_browser_roots_text),
@@ -1131,6 +1146,13 @@ watch(isRunning, async (running, wasRunning) => {
   border-radius: 8px;
   background: rgba(255, 250, 244, 0.76);
   box-shadow: 0 14px 34px rgba(91, 55, 38, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.model-profile-card:hover {
+  border-color: rgba(201, 100, 66, 0.34);
+  background: rgba(255, 250, 244, 0.9);
+  box-shadow: 0 18px 40px rgba(91, 55, 38, 0.12), 0 0 0 4px rgba(201, 100, 66, 0.06);
 }
 
 .model-profile-card.inactive {

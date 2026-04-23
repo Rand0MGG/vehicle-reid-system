@@ -32,6 +32,7 @@
           :preview-url="previewUrl"
           :accept="queryAccept"
           :helper-message="uploadHelperMessage"
+          :scanning="loading"
           @file-change="handleFileChange"
           @reset="resetQuery"
         />
@@ -129,7 +130,7 @@
             <strong>{{ searched ? '本次检索' : '当前可用能力' }}</strong>
             <p>
               {{ searched
-                ? `模式 ${searchMeta.searchMode.toUpperCase()}，特征 ${searchMeta.featureDim || '--'} 维，深度思考${searchMeta.deepThinkingUsed ? '已启用' : '未启用'}。`
+                ? `模式 ${searchMeta.searchMode.toUpperCase()}，特征 ${searchMeta.featureDim || '--'} 维，深度思考${searchMeta.deepThinkingUsed ? `已启用，候选 ${searchMeta.rerankCandidateCount || 0} / 图库 ${searchMeta.gallerySize || 0}` : '未启用'}。`
                 : capabilityText }}
             </p>
           </div>
@@ -143,7 +144,7 @@
         </SectionCard>
       </div>
 
-      <ResultGrid :results="results" :searched="searched" :loading="loading" :time-cost="timeCost" />
+      <ResultGrid :results="results" :searched="searched" :loading="loading" :time-cost="timeCost" :search-meta="searchMeta" />
     </div>
   </div>
 </template>

@@ -73,6 +73,8 @@ class ConfigUpdate(BaseModel):
     max_results: int
     search_default_top_k: int
     max_deep_thinking_gallery_size: int = 5000
+    deep_thinking_candidate_limit_min: int = 100
+    deep_thinking_candidate_limit_max: int = 500
     gallery_poll_interval_ms: int = 1500
     allowed_query_suffixes: list[str] = Field(default_factory=lambda: list(DEFAULT_ALLOWED_QUERY_SUFFIXES))
     file_browser_roots: list[str] = Field(default_factory=list)
@@ -253,6 +255,8 @@ def _serialize_model_state(db: Session) -> dict:
         "max_results": int(config.get("max_results", 50)),
         "search_default_top_k": int(config.get("search_default_top_k", 10)),
         "max_deep_thinking_gallery_size": int(config.get("max_deep_thinking_gallery_size", 5000)),
+        "deep_thinking_candidate_limit_min": int(config.get("deep_thinking_candidate_limit_min", 100)),
+        "deep_thinking_candidate_limit_max": int(config.get("deep_thinking_candidate_limit_max", 500)),
         "allowed_query_suffixes": config.get("allowed_query_suffixes", list(DEFAULT_ALLOWED_QUERY_SUFFIXES)),
     }
 
@@ -265,6 +269,8 @@ def _serialize_config() -> dict:
         "max_results": int(config.get("max_results", 50)),
         "search_default_top_k": int(config.get("search_default_top_k", 10)),
         "max_deep_thinking_gallery_size": int(config.get("max_deep_thinking_gallery_size", 5000)),
+        "deep_thinking_candidate_limit_min": int(config.get("deep_thinking_candidate_limit_min", 100)),
+        "deep_thinking_candidate_limit_max": int(config.get("deep_thinking_candidate_limit_max", 500)),
         "gallery_poll_interval_ms": int(config.get("gallery_poll_interval_ms", 1500)),
         "allowed_query_suffixes": config.get("allowed_query_suffixes", list(DEFAULT_ALLOWED_QUERY_SUFFIXES)),
         "file_browser_roots": config.get("file_browser_roots", []),
@@ -745,6 +751,8 @@ def update_config(
         "max_results": config_in.max_results,
         "search_default_top_k": config_in.search_default_top_k,
         "max_deep_thinking_gallery_size": config_in.max_deep_thinking_gallery_size,
+        "deep_thinking_candidate_limit_min": config_in.deep_thinking_candidate_limit_min,
+        "deep_thinking_candidate_limit_max": config_in.deep_thinking_candidate_limit_max,
         "gallery_poll_interval_ms": config_in.gallery_poll_interval_ms,
         "allowed_query_suffixes": config_in.allowed_query_suffixes,
         "file_browser_roots": config_in.file_browser_roots,

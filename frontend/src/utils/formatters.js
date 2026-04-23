@@ -69,6 +69,8 @@ export function normalizeModelState(payload = {}) {
   const maxResults = Number(payload.max_results ?? 50)
   const searchDefaultTopK = Number(payload.search_default_top_k ?? 10)
   const maxDeepThinkingGallerySize = Number(payload.max_deep_thinking_gallery_size ?? 5000)
+  const deepThinkingCandidateLimitMin = Number(payload.deep_thinking_candidate_limit_min ?? 100)
+  const deepThinkingCandidateLimitMax = Number(payload.deep_thinking_candidate_limit_max ?? 500)
 
   return {
     modelProfiles,
@@ -83,6 +85,8 @@ export function normalizeModelState(payload = {}) {
     galleryImageCount: Number(payload.gallery_image_count ?? 0),
     galleryFeatureCount: Number(payload.gallery_feature_count ?? 0),
     maxDeepThinkingGallerySize: Number.isFinite(maxDeepThinkingGallerySize) ? maxDeepThinkingGallerySize : 5000,
+    deepThinkingCandidateLimitMin: Number.isFinite(deepThinkingCandidateLimitMin) ? deepThinkingCandidateLimitMin : 100,
+    deepThinkingCandidateLimitMax: Number.isFinite(deepThinkingCandidateLimitMax) ? deepThinkingCandidateLimitMax : 500,
     maxResults: Number.isFinite(maxResults) ? maxResults : 50,
     searchDefaultTopK: Number.isFinite(searchDefaultTopK) ? searchDefaultTopK : 10,
     allowedQuerySuffixes: Array.isArray(payload.allowed_query_suffixes) ? payload.allowed_query_suffixes : []
@@ -102,6 +106,7 @@ export function normalizeSearchResults(items = []) {
     vehicle_id: item?.vehicle_id || '未标注车辆',
     cam_id: item?.cam_id || '未知摄像头',
     capture_time: item?.capture_time || '',
+    img_path: item?.img_path || '',
     score: Number.isFinite(Number(item?.score)) ? Number(item.score) : 0,
     rerank_distance: Number.isFinite(Number(item?.rerank_distance)) ? Number(item.rerank_distance) : null
   }))

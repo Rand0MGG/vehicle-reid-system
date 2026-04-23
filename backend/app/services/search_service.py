@@ -19,6 +19,8 @@ class SearchService:
         similarity_threshold: float = 0.0,
         search_mode: str = "fast",
         deep_thinking: bool = False,
+        deep_thinking_candidate_limit_min: int = 100,
+        deep_thinking_candidate_limit_max: int = 500,
     ):
         normalized_mode = self._normalize_mode(search_mode)
         reid_engine.configure(profile=revision, eager=reid_engine.initialized)
@@ -31,14 +33,18 @@ class SearchService:
         results = self._calculate_similarity(
             query_feat,
             gallery_data,
+            top_k=top_k,
             similarity_threshold=similarity_threshold,
             deep_thinking=deep_thinking,
+            deep_thinking_candidate_limit_min=deep_thinking_candidate_limit_min,
+            deep_thinking_candidate_limit_max=deep_thinking_candidate_limit_max,
         )
         return {
-            "results": results[:top_k],
+            "results": results["items"][:top_k],
             "feature_dim": int(query_feat.size),
             "gallery_size": len(gallery_data["meta"]),
-            "deep_thinking_used": bool(deep_thinking and len(gallery_data["meta"]) > 0),
+            "rerank_candidate_count": int(results["rerank_candidate_count"]),
+            "deep_thinking_used": bool(deep_thinking and results["rerank_candidate_count"] > 0),
         }
 
     def _normalize_mode(self, search_mode: str) -> str:
@@ -96,8 +102,11 @@ class SearchService:
         self,
         query_feat: np.ndarray,
         gallery_data,
+        top_k: int = 10,
         similarity_threshold: float = 0.0,
         deep_thinking: bool = False,
+        deep_thinking_candidate_limit_min: int = 100,
+        deep_thinking_candidate_limit_max: int = 500,
     ):
         gallery_matrix = gallery_data["matrix"]
         metadata = gallery_data["meta"]
@@ -111,9 +120,20 @@ class SearchService:
 
         sorted_indices = np.argsort(sim_scores)[::-1]
         rerank_distances = None
+        rerank_candidate_count = 0
         if deep_thinking:
-            rerank_distances = self._calculate_rerank_distances(query_feat, gallery_matrix)
-            sorted_indices = np.argsort(rerank_distances)
+            rerank_candidate_count = self._resolve_rerank_candidate_count(
+                gallery_size=gallery_matrix.shape[0],
+                top_k=top_k,
+                min_limit=deep_thinking_candidate_limit_min,
+                max_limit=deep_thinking_candidate_limit_max,
+            )
+            candidate_indices = sorted_indices[:rerank_candidate_count]
+            candidate_matrix = gallery_matrix[candidate_indices]
+            candidate_distances = self._calculate_rerank_distances(query_feat, candidate_matrix)
+            rerank_distances = np.full(gallery_matrix.shape[0], np.nan, dtype=np.float32)
+            rerank_distances[candidate_indices] = candidate_distances
+            sorted_indices = candidate_indices[np.argsort(candidate_distances)]
 
         results = []
         for idx in sorted_indices:
@@ -135,7 +155,18 @@ class SearchService:
                 item["rerank_distance"] = float(rerank_distances[idx])
             results.append(item)
 
-        return results
+        return {"items": results, "rerank_candidate_count": rerank_candidate_count}
+
+    def _resolve_rerank_candidate_count(self, gallery_size: int, top_k: int, min_limit: int, max_limit: int) -> int:
+        gallery_size = max(0, int(gallery_size))
+        if gallery_size == 0:
+            return 0
+        safe_top_k = max(1, int(top_k or 1))
+        safe_min = max(1, int(min_limit or 100))
+        safe_max = max(safe_min, int(max_limit or safe_min))
+        target_count = min(max(safe_top_k * 5, safe_min), safe_max)
+        target_count = max(safe_top_k, target_count)
+        return min(gallery_size, target_count)
 
     def _calculate_rerank_distances(self, query_feat: np.ndarray, gallery_matrix: np.ndarray) -> np.ndarray:
         query_matrix = query_feat.reshape(1, -1)

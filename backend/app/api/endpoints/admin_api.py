@@ -22,6 +22,7 @@ from app.models.user import User
 from app.models.vehicle import GalleryFeature, GalleryImage, VehicleIdentity
 from app.schemas.audit_schema import AuditLogResponse
 from app.services.gallery_service import (
+    append_log,
     clear_features_for_revision,
     create_build_task,
     delete_gallery_image,
@@ -156,6 +157,13 @@ def _ensure_valid_role(role: str) -> str:
     if normalized_role not in {"admin", "user"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="账号角色只能是 admin 或 user。")
     return normalized_role
+
+
+def _count_admin_users(db: Session, *, exclude_user_id: Optional[int] = None) -> int:
+    query = db.query(func.count(User.id)).filter(User.role == "admin")
+    if exclude_user_id is not None:
+        query = query.filter(User.id != exclude_user_id)
+    return int(query.scalar() or 0)
 
 
 def _serialize_user(user: User) -> dict:
@@ -535,6 +543,11 @@ def build_model_features(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     task = create_build_task(db, revision, actor_user_id=current_user.id, rebuild=payload.rebuild)
+    start_gallery_operation("feature_build", "已提交模型特征构建任务。")
+    sync_status["task_id"] = task.id
+    sync_status["model_profile_id"] = profile.id
+    sync_status["model_revision_id"] = revision.id
+    append_log(f"等待后台开始构建：{profile.name}")
     background_tasks.add_task(run_feature_build_task, task.id, current_user.id)
     _audit(audit_logger, current_user.id, f"启动模型特征构建 {profile.name}", True)
     return _success({"task_id": task.id}, message="已开始构建该模型的图库特征。")
@@ -837,6 +850,8 @@ def update_user(
         role = _ensure_valid_role(user_in.role)
         if user.is_builtin and role != "admin":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="内置账号不能降级为普通用户。")
+        if user.role == "admin" and role != "admin" and _count_admin_users(db) <= 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="系统至少需要保留一个管理员账号。")
         user.role = role
 
     if user_in.password is not None and user_in.password.strip():
@@ -860,6 +875,8 @@ def delete_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="账号不存在。")
     if user.is_builtin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="系统内置账号不可删除。")
+    if user.role == "admin" and _count_admin_users(db) <= 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="系统至少需要保留一个管理员账号。")
     username = user.username
     db.delete(user)
     db.commit()

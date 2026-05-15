@@ -113,17 +113,6 @@
             <el-form-item label="返回结果数量">
               <el-slider v-model="topK" :min="1" :max="maxResults" show-input />
             </el-form-item>
-
-            <el-form-item label="时间范围过滤">
-              <el-date-picker
-                v-model="dateRange"
-                type="datetimerange"
-                range-separator="至"
-                start-placeholder="开始时间"
-                end-placeholder="结束时间"
-                value-format="YYYY-MM-DD HH:mm:ss"
-              />
-            </el-form-item>
           </el-form>
 
           <div class="helper-note">
@@ -176,7 +165,6 @@ const {
   searchMode,
   deepThinking,
   searchMeta,
-  dateRange,
   file,
   previewUrl,
   results,
@@ -207,14 +195,12 @@ const capabilityText = computed(() => {
 const searchSummaryText = computed(() => {
   const mode = (searchMeta.value.searchMode || 'fast').toUpperCase()
   const featureDim = searchMeta.value.featureDim || '--'
-  const filtered = searchMeta.value.filteredGallerySize || searchMeta.value.gallerySize || 0
-  const total = searchMeta.value.gallerySize || 0
+  const gallerySize = searchMeta.value.gallerySize || 0
   const sortText = searchMeta.value.sortBasis === 'rerank_distance' ? '重排距离从低到高' : '相似度从高到低'
   const deepText = searchMeta.value.deepThinkingUsed
-    ? `深度思考已启用，候选 ${searchMeta.value.rerankCandidateCount || 0} / ${filtered}`
+    ? `深度思考已启用，候选 ${searchMeta.value.rerankCandidateCount || 0} / ${gallerySize}`
     : '深度思考未启用'
-  const filterText = searchMeta.value.timeFilterUsed ? `，时间过滤后图库 ${filtered} / ${total}` : ''
-  return `模式 ${mode}，特征 ${featureDim} 维，排序依据：${sortText}，${deepText}${filterText}。`
+  return `模式 ${mode}，特征 ${featureDim} 维，图库 ${gallerySize} 张，排序依据：${sortText}，${deepText}。`
 })
 const queryAccept = computed(() => allowedQuerySuffixes.value.length ? allowedQuerySuffixes.value.join(',') : 'image/*')
 const uploadHelperMessage = computed(() => {

@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { searchVehicle } from '@/api/search'
-import { formatDateTime, normalizeSearchResults } from '@/utils/formatters'
+import { normalizeSearchResults } from '@/utils/formatters'
 
 function describeSupportedFormats(allowedQuerySuffixes) {
   if (!Array.isArray(allowedQuerySuffixes) || allowedQuerySuffixes.length === 0) {
@@ -15,21 +15,12 @@ function createDefaultSearchMeta(searchMode = 'fast', deepThinking = false) {
     searchMode,
     featureDim: 0,
     gallerySize: 0,
-    filteredGallerySize: 0,
     rerankCandidateCount: 0,
     deepThinkingRequested: deepThinking,
     deepThinkingUsed: false,
     sortBasis: 'similarity',
-    timeFilterUsed: false,
-    timeFilter: null,
     timings: {}
   }
-}
-
-function toDateTimePayload(value) {
-  if (!value) return ''
-  if (value instanceof Date) return formatDateTime(value)
-  return String(value).replace('T', ' ').slice(0, 19)
 }
 
 export function useSearchWorkflow() {
@@ -42,7 +33,6 @@ export function useSearchWorkflow() {
   const searchMode = ref('fast')
   const deepThinking = ref(false)
   const searchMeta = ref(createDefaultSearchMeta())
-  const dateRange = ref([])
   const file = ref(null)
   const previewUrl = ref('')
   const results = ref([])
@@ -144,12 +134,6 @@ export function useSearchWorkflow() {
       formData.append('search_mode', searchMode.value)
       formData.append('deep_thinking', deepThinking.value ? 'true' : 'false')
 
-      const [rangeStart, rangeEnd] = Array.isArray(dateRange.value) ? dateRange.value : []
-      const startPayload = toDateTimePayload(rangeStart)
-      const endPayload = toDateTimePayload(rangeEnd)
-      if (startPayload) formData.append('start_time', startPayload)
-      if (endPayload) formData.append('end_time', endPayload)
-
       const response = await searchVehicle(formData, { deepThinking: deepThinking.value })
       const normalizedResults = normalizeSearchResults(response.data?.results)
       const sortBasis = response.data?.sort_basis || 'similarity'
@@ -161,13 +145,10 @@ export function useSearchWorkflow() {
         searchMode: response.data?.search_mode || searchMode.value,
         featureDim: Number(response.data?.feature_dim ?? 0),
         gallerySize: Number(response.data?.gallery_size ?? 0),
-        filteredGallerySize: Number(response.data?.filtered_gallery_size ?? response.data?.gallery_size ?? 0),
         rerankCandidateCount: Number(response.data?.rerank_candidate_count ?? 0),
         deepThinkingRequested: Boolean(response.data?.deep_thinking_requested),
         deepThinkingUsed: Boolean(response.data?.deep_thinking_used),
         sortBasis,
-        timeFilterUsed: Boolean(response.data?.time_filter_used),
-        timeFilter: response.data?.time_filter || (startPayload || endPayload ? { start_time: startPayload, end_time: endPayload } : null),
         timings
       }
       searched.value = true
@@ -216,7 +197,6 @@ export function useSearchWorkflow() {
     searchMode,
     deepThinking,
     searchMeta,
-    dateRange,
     file,
     previewUrl,
     results,

@@ -454,14 +454,26 @@ def run_feature_build_task(
     task_id: int,
     actor_user_id: Optional[int] = None,
 ) -> None:
-    if sync_status["is_running"]:
-        return
-
     db = SessionLocal()
-    start_gallery_operation("feature_build", "开始构建模型图库特征。")
-    sync_status["task_id"] = task_id
 
     try:
+        if sync_status["is_running"] and sync_status.get("task_id") not in {None, task_id}:
+            task = db.query(FeatureBuildTask).filter(FeatureBuildTask.id == task_id).first()
+            if task:
+                task.status = "failed"
+                task.finished_at = datetime.now()
+                task.message = "后台任务队列被其他图库任务占用，未能启动。"
+                db.commit()
+            execute_audit_insertion(actor_user_id, "构建模型图库特征失败", False)
+            return
+
+        if not sync_status["is_running"] or sync_status.get("task_id") != task_id:
+            start_gallery_operation("feature_build", "开始构建模型图库特征。")
+            sync_status["task_id"] = task_id
+        else:
+            sync_status["message"] = "开始构建模型图库特征。"
+            append_log(sync_status["message"])
+
         task = db.query(FeatureBuildTask).filter(FeatureBuildTask.id == task_id).first()
         if not task:
             finish_gallery_operation("任务记录不存在。")

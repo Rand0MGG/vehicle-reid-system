@@ -112,8 +112,24 @@ export function normalizeSearchResults(items = []) {
     cam_id: item?.cam_id || '未知摄像头',
     capture_time: item?.capture_time || '',
     img_path: item?.img_path || '',
+    vehicle_gallery_token: item?.vehicle_gallery_token || '',
     score: Number.isFinite(Number(item?.score)) ? Number(item.score) : 0,
     rerank_distance: Number.isFinite(Number(item?.rerank_distance)) ? Number(item.rerank_distance) : null
+  }))
+}
+
+export function normalizeGalleryImages(items = []) {
+  if (!Array.isArray(items)) {
+    return []
+  }
+
+  return items.map((item) => ({
+    image_id: Number(item?.image_id ?? 0),
+    img_url: item?.img_url || '',
+    vehicle_id: item?.vehicle_id || '未标注车辆',
+    cam_id: item?.cam_id || '未知摄像头',
+    capture_time: item?.capture_time || '',
+    img_path: item?.img_path || ''
   }))
 }
 

@@ -1,6 +1,4 @@
 import time
-from datetime import datetime
-from typing import Optional
 
 import numpy as np
 from sqlalchemy import func
@@ -27,8 +25,6 @@ class SearchService:
         deep_thinking_candidate_limit_min: int = 100,
         deep_thinking_candidate_limit_max: int = 500,
         max_deep_thinking_gallery_size: int = 5000,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
     ):
         total_started = time.perf_counter()
         normalized_mode = self._normalize_mode(search_mode)
@@ -42,21 +38,16 @@ class SearchService:
         gallery_data = self._fetch_gallery_data(
             revision=revision,
             search_mode=normalized_mode,
-            start_time=start_time,
-            end_time=end_time,
         )
         load_gallery_seconds = time.perf_counter() - load_started
-        time_filter_used = start_time is not None or end_time is not None
 
         if gallery_data["matrix"].shape[0] == 0:
-            if time_filter_used:
-                raise ValueError("该时间范围内没有可检索的图库特征。")
             raise ValueError("该模型还没有可检索的图库特征，请先在后台为该模型构建特征。")
 
         if deep_thinking and gallery_data["matrix"].shape[0] > int(max_deep_thinking_gallery_size):
             raise ValueError(
                 f"深度思考最多支持 {int(max_deep_thinking_gallery_size)} 张候选图库图片，"
-                f"当前筛选后有 {gallery_data['matrix'].shape[0]} 张。"
+                f"当前有 {gallery_data['matrix'].shape[0]} 张。"
             )
 
         results = self._calculate_similarity(
@@ -81,11 +72,9 @@ class SearchService:
             "results": results["items"][:top_k],
             "feature_dim": int(query_feat.size),
             "gallery_size": int(gallery_data["total_count"]),
-            "filtered_gallery_size": len(gallery_data["meta"]),
             "rerank_candidate_count": int(results["rerank_candidate_count"]),
             "deep_thinking_used": deep_thinking_used,
             "sort_basis": "rerank_distance" if deep_thinking_used else "similarity",
-            "time_filter_used": time_filter_used,
             "timings": timings,
         }
 
@@ -102,8 +91,6 @@ class SearchService:
         self,
         revision: ModelRevision,
         search_mode: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
     ):
         expected_full_dim = int(revision.full_feature_dim)
         expected_view_dim = int(revision.global_feature_dim if search_mode == "fast" else revision.full_feature_dim)
@@ -123,12 +110,6 @@ class SearchService:
             )
             .filter(GalleryFeature.model_revision_id == revision.id)
         )
-        if start_time is not None or end_time is not None:
-            query = query.filter(GalleryImage.capture_time.isnot(None))
-        if start_time is not None:
-            query = query.filter(GalleryImage.capture_time >= start_time)
-        if end_time is not None:
-            query = query.filter(GalleryImage.capture_time <= end_time)
 
         records = query.order_by(GalleryFeature.id.asc()).all()
 

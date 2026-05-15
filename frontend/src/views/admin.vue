@@ -4,7 +4,7 @@
       <PageHeader
         eyebrow="Admin Console"
         title="后台控制台"
-        description="系统设置只管理系统参数；模型配置独立维护模型档案、发布状态和每个模型的图库特征。"
+        description="后台控制台用于维护系统配置、模型与图库，并查看运行状态、日志和账号权限。"
       >
         <template #meta>
           <div class="header-meta">
@@ -140,39 +140,41 @@
               </div>
             </div>
 
-            <div class="top-gap">
+            <div class="gallery-stack">
               <TerminalLogPanel title="图库任务日志" :logs="logs" :is-running="isRunning" :status="galleryTaskStatus" />
-            </div>
 
-            <div class="stats-grid compact-grid">
-              <StatCard label="图片记录" :value="String(overview.total_images)" hint="gallery_image 记录数" number />
-              <StatCard label="特征记录" :value="String(overview.total_features)" hint="所有模型版本的特征总数" number />
-              <StatCard label="唯一车辆" :value="String(overview.total_vehicles)" hint="vehicle_identity 记录数" number />
-            </div>
+              <div class="stats-grid compact-grid gallery-stats-grid">
+                <StatCard label="图片记录" :value="String(overview.total_images)" hint="gallery_image 记录数" number />
+                <StatCard label="特征记录" :value="String(overview.total_features)" hint="所有模型版本的特征总数" number />
+                <StatCard label="唯一车辆" :value="String(overview.total_vehicles)" hint="vehicle_identity 记录数" number />
+              </div>
 
-            <el-table :data="galleryImages" v-loading="loadingGallery" style="width: 100%">
-              <el-table-column prop="id" label="ID" width="80" />
-              <el-table-column prop="vehicle_id" label="车辆 ID" width="140" show-overflow-tooltip />
-              <el-table-column prop="cam_id" label="摄像头" width="120" show-overflow-tooltip />
-              <el-table-column prop="img_path" label="图片路径" min-width="360" show-overflow-tooltip />
-              <el-table-column prop="feature_count" label="引用特征" width="110" />
-              <el-table-column label="操作" width="110" align="center">
-                <template #default="scope">
-                  <el-button size="small" plain type="danger" :disabled="scope.row.feature_count > 0" @click="handleDeleteImage(scope.row)">
-                    删除记录
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
+              <div class="gallery-table-shell">
+                <el-table :data="galleryImages" v-loading="loadingGallery" class="gallery-table">
+                  <el-table-column prop="id" label="ID" width="80" />
+                  <el-table-column prop="vehicle_id" label="车辆 ID" width="140" show-overflow-tooltip />
+                  <el-table-column prop="cam_id" label="摄像头" width="120" show-overflow-tooltip />
+                  <el-table-column prop="img_path" label="图片路径" min-width="360" show-overflow-tooltip />
+                  <el-table-column prop="feature_count" label="引用特征" width="110" />
+                  <el-table-column label="操作" width="110" align="center">
+                    <template #default="scope">
+                      <el-button size="small" plain type="danger" :disabled="scope.row.feature_count > 0" @click="handleDeleteImage(scope.row)">
+                        删除记录
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
 
-            <div class="pagination-wrap">
-              <el-pagination
-                layout="prev, pager, next"
-                :total="galleryTotal"
-                :page-size="galleryPageSize"
-                v-model:current-page="galleryPage"
-                @current-change="loadGalleryImages"
-              />
+                <div class="pagination-wrap gallery-pagination">
+                  <el-pagination
+                    layout="prev, pager, next"
+                    :total="galleryTotal"
+                    :page-size="galleryPageSize"
+                    v-model:current-page="galleryPage"
+                    @current-change="loadGalleryImages"
+                  />
+                </div>
+              </div>
             </div>
           </SectionCard>
 
@@ -1080,6 +1082,12 @@ watch(isRunning, async (running, wasRunning) => {
   min-width: 0;
 }
 
+.gallery-stack {
+  display: grid;
+  gap: 20px;
+  margin-top: 20px;
+}
+
 .settings-inline-grid,
 .gallery-register-grid,
 .stats-grid,
@@ -1094,12 +1102,17 @@ watch(isRunning, async (running, wasRunning) => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.gallery-stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .overview-strip.small {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .soft-panel,
-.monitor-detail {
+.monitor-detail,
+.gallery-table-shell {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -1119,6 +1132,38 @@ watch(isRunning, async (running, wasRunning) => {
   font-family: var(--font-serif);
   font-size: 24px;
   font-weight: 500;
+}
+
+.gallery-table-shell {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.gallery-table {
+  width: 100%;
+}
+
+.gallery-table-shell :deep(.el-table) {
+  --el-table-border-color: rgba(171, 96, 67, 0.12);
+  --el-table-header-bg-color: rgba(255, 250, 244, 0.9);
+  --el-table-row-hover-bg-color: rgba(255, 250, 244, 0.72);
+  background: transparent;
+}
+
+.gallery-table-shell :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.gallery-table-shell :deep(.el-table th.el-table__cell) {
+  background: rgba(255, 250, 244, 0.92);
+}
+
+.gallery-table-shell :deep(.el-table td.el-table__cell),
+.gallery-table-shell :deep(.el-table th.el-table__cell) {
+  padding-top: 14px;
+  padding-bottom: 14px;
 }
 
 .register-options,
@@ -1267,6 +1312,13 @@ watch(isRunning, async (running, wasRunning) => {
   margin-top: 18px;
 }
 
+.gallery-pagination {
+  margin-top: 0;
+  padding: 14px 18px 16px;
+  border-top: 1px solid rgba(171, 96, 67, 0.12);
+  background: rgba(255, 250, 244, 0.62);
+}
+
 .dialog-footer {
   display: flex;
   justify-content: space-between;
@@ -1280,7 +1332,8 @@ watch(isRunning, async (running, wasRunning) => {
   .gallery-register-grid,
   .stats-grid,
   .overview-strip,
-  .overview-strip.small {
+  .overview-strip.small,
+  .gallery-stats-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     SEARCH_UPLOAD_DIR: str = str(REPO_ROOT / "tmp" / "search_uploads")
 
     DEVICE: str = "cpu"
+    ALLOW_DESTRUCTIVE_STARTUP_MIGRATIONS: bool = False
 
     JWT_SECRET_KEY: str
     SQLALCHEMY_DATABASE_URI: str

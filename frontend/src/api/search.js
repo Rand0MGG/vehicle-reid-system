@@ -13,3 +13,16 @@ export function searchVehicle(data, options = {}) {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
+
+export function fetchVehicleImages(vehicleId, galleryToken, params = {}) {
+  return request({
+    url: '/gallery/vehicle-images',
+    method: 'get',
+    params: {
+      vehicle_id: vehicleId,
+      gallery_token: galleryToken,
+      page: params.page || 1,
+      page_size: params.pageSize || 36
+    }
+  })
+}

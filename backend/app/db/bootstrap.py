@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy import inspect, text
 
+from app.core.config import settings
 from app.db.session import engine
 from app.models.base import Base
 
@@ -114,6 +115,36 @@ def _drop_tables(conn, table_names: tuple[str, ...]) -> None:
         conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
 
+def find_incompatible_tables() -> list[str]:
+    incompatible: list[str] = []
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+
+        if inspector.has_table("vehicle_feature"):
+            incompatible.extend(
+                table_name
+                for table_name in DROP_GROUPS["legacy"]
+                if inspector.has_table(table_name)
+            )
+
+        if any(_is_incompatible(inspector, table) for table in ("model_profile", "model_revision")):
+            incompatible.extend(
+                table_name
+                for table_name in DROP_GROUPS["model"]
+                if inspector.has_table(table_name)
+            )
+            inspector = inspect(conn)
+
+        if any(_is_incompatible(inspector, table) for table in ("gallery_image", "gallery_feature", "feature_build_task")):
+            incompatible.extend(
+                table_name
+                for table_name in DROP_GROUPS["gallery"]
+                if inspector.has_table(table_name)
+            )
+
+    return sorted(set(incompatible))
+
+
 def drop_incompatible_development_tables() -> None:
     """Drop old development tables that cannot safely run with the new schema.
 
@@ -140,6 +171,21 @@ def drop_incompatible_development_tables() -> None:
 def run_startup_migrations() -> None:
     """Create the current database structure without seeding users."""
 
-    drop_incompatible_development_tables()
+    incompatible_tables = find_incompatible_tables()
+    if incompatible_tables:
+        if settings.ALLOW_DESTRUCTIVE_STARTUP_MIGRATIONS:
+            logger.warning(
+                "ALLOW_DESTRUCTIVE_STARTUP_MIGRATIONS is enabled; dropping incompatible tables: %s",
+                ", ".join(incompatible_tables),
+            )
+            drop_incompatible_development_tables()
+        else:
+            joined = ", ".join(incompatible_tables)
+            raise RuntimeError(
+                "Incompatible database schema detected for tables: "
+                f"{joined}. Refusing to drop tables automatically. "
+                "If this is an intentional development reset, set "
+                "ALLOW_DESTRUCTIVE_STARTUP_MIGRATIONS=true and restart."
+            )
     Base.metadata.create_all(bind=engine)
     logger.info("Database structure checked")
